@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 type ServiceStatus = "Completed" | "Missed" | "Client Closed";
 type PayMode = "Hourly" | "Flat rate" | "% of job" | "Monthly" | "Semimonthly";
 type MessageAudience = "client" | "cleaner";
+type DemoRole = "Owner/Admin" | "Cleaner" | "Client/School";
+type DraftRecord = { id: number; audience: MessageAudience; recipient: string; location: string; status: ServiceStatus; time: string; reason: string; body: string };
 type LocationRecord = (typeof initialLocations)[number];
 type CleanerRecord = { id: number; name: string; initials: string; role: string; email: string; phone: string; availability: string; location: string; shift: string; payMethod: string };
 type ClientRecord = { id: number; name: string; title: string; email: string; phone: string; location: string; notes: string };
@@ -84,6 +86,7 @@ const initialClients: ClientRecord[] = [
 ];
 
 const initialSettings: DemoSettings = { company: "Brightline Cleaning Co.", serviceArea: "Harbor City Metro", email: "ops@brightline-demo.example", timezone: "Eastern Time", defaultPay: "Hourly", emailUpdates: true, autoReminders: true };
+const initialJobDraft = { client: "Jordan Ellis", location: "Harbor Point Offices", date: "2026-07-19", start: "9:00 AM", end: "11:00 AM", cleaner: "Maya Chen", value: 225, status: "Completed" as ServiceStatus, instructions: "Clean entry, offices, restrooms, and breakroom.", notes: "Fictional internal demo note." };
 
 const initialActivity: ActivityItem[] = [
   { id: 1, icon: "✓", color: "teal-bg", title: "Maya completed Harbor Point Offices", detail: "Quality checklist: 24/24", time: "Today · 8:21 AM", reason: "Cleaner submitted the completed service checklist." },
@@ -98,7 +101,11 @@ function Icon({ children }: { children: React.ReactNode }) {
   return <span className="nav-icon" aria-hidden="true">{children}</span>;
 }
 
-function SectionView({ section, locations, setLocations, cleaners, setCleaners, clients, setClients, settings, setSettings, onBack, onOpenPay, showToast }: {
+function MessageOverlay({ audience, text: value, editing, setEditing, setText, onCopy, onSave, onClose }: { audience: MessageAudience; text: string; editing: boolean; setEditing: (value: boolean) => void; setText: (value: string) => void; onCopy: () => void; onSave: () => void; onClose: () => void }) {
+  return <div className="modal-backdrop"><section className="message-modal" role="dialog" aria-modal="true" aria-label={`AI draft for ${audience}`}><div className="modal-header"><div><span className="calculator-mark">✦</span><div><p>AI-ASSISTED DEMO DRAFT</p><h2>Message {audience === "client" ? "Client" : "Cleaner"}</h2></div></div><button onClick={onClose} aria-label="Close draft">×</button></div><p className="modal-intro">Editable fictional draft only. This prototype never sends email or text messages.</p><textarea className="message-editor" aria-label="Draft message" readOnly={!editing} value={value} onChange={(e) => setText(e.target.value)} /><div className="message-actions"><button onClick={onCopy}>Copy</button><button onClick={() => setEditing(!editing)}>{editing ? "Done Editing" : "Edit"}</button><button onClick={() => setEditing(false)}>Cancel</button><button onClick={onSave}>Save Draft</button><button onClick={onClose}>Close</button></div></section></div>;
+}
+
+function SectionView({ section, locations, setLocations, cleaners, setCleaners, clients, setClients, settings, setSettings, drafts, onBack, onOpenPay, onMessage, onActivity, showToast }: {
   section: string;
   locations: LocationRecord[];
   setLocations: React.Dispatch<React.SetStateAction<LocationRecord[]>>;
@@ -108,8 +115,11 @@ function SectionView({ section, locations, setLocations, cleaners, setCleaners, 
   setClients: React.Dispatch<React.SetStateAction<ClientRecord[]>>;
   settings: DemoSettings;
   setSettings: React.Dispatch<React.SetStateAction<DemoSettings>>;
+  drafts: DraftRecord[];
   onBack: () => void;
   onOpenPay: () => void;
+  onMessage: (audience: MessageAudience, locationId: number) => void;
+  onActivity: (item: Omit<ActivityItem, "id">) => void;
   showToast: (message: string) => void;
 }) {
   const [modal, setModal] = useState<{ kind: "service" | "location" | "cleaner" | "client"; id: number } | null>(null);
@@ -125,6 +135,7 @@ function SectionView({ section, locations, setLocations, cleaners, setCleaners, 
     Reports: { eyebrow: "PERFORMANCE", title: "Operations summary", description: "Fictional service, pay, and revenue information for this demo." },
     "Help center": { eyebrow: "DEMO SUPPORT", title: "Help center", description: "A quick guide to the main CleanFlow AI prototype features." },
     Settings: { eyebrow: "DEMO PREFERENCES", title: "Company settings", description: "Fictional business settings and cleaner pay preferences." },
+    Communications: { eyebrow: "COMMUNICATIONS", title: "Communication Center", description: "Saved fictional client and cleaner message drafts. Nothing is sent." },
   };
   const copy = sectionCopy[section] ?? sectionCopy.Schedule;
   const selected: any = modal ? (modal.kind === "cleaner" ? cleaners : modal.kind === "client" ? clients : locations).find((item) => item.id === modal.id) : null;
@@ -138,6 +149,7 @@ function SectionView({ section, locations, setLocations, cleaners, setCleaners, 
     else setLocations((all) => all.map((item) => item.id === draft.id ? { ...draft, value: Number(draft.value) } : item));
     setEditing(false);
     showToast(`${modal.kind === "service" ? "Service" : modal.kind[0].toUpperCase() + modal.kind.slice(1)} details saved`);
+    onActivity({ icon: "✎", color: "blue-bg", title: `${modal.kind === "service" ? "Service" : modal.kind} details edited`, detail: draft.name, time: "Just now", reason: "Demo record updated for the current session." });
   };
   const updateDraft = (field: string, value: string | number) => setDraft((current: any) => ({ ...current, [field]: value }));
   const guides = [
@@ -166,6 +178,8 @@ function SectionView({ section, locations, setLocations, cleaners, setCleaners, 
 
     {section === "Help center" && <div className="help-grid"><article className="panel-card help-intro"><div className="help-mark">?</div><h2>CleanFlow AI demo guide</h2><p>Use the dashboard to review service status, update locations, draft messages, calculate cleaner pay, and inspect the fictional activity log.</p></article><article className="panel-card help-list">{guides.map(([title, explanation], index) => <div className={openGuide === index ? "guide-open" : ""} key={title}><button aria-expanded={openGuide === index} onClick={() => setOpenGuide(openGuide === index ? null : index)}><span>{index + 1}</span><p><strong>{title}</strong><small>{openGuide === index ? explanation : "Select to learn more"}</small></p><b>{openGuide === index ? "−" : "+"}</b></button></div>)}</article></div>}
 
+    {section === "Communications" && <div className="panel-card communication-list"><div className="section-card-head"><div><h2>Saved message drafts</h2><p>{drafts.length} fictional drafts · no messages have been sent</p></div></div>{drafts.length ? drafts.map((item) => <article key={item.id}><span className={`draft-kind ${item.audience}`}>{item.audience === "client" ? "Client" : "Cleaner"}</span><div><h3>{item.recipient}</h3><p>{item.location} · {item.status}</p><small>{item.time} · Reason: {item.reason}</small></div><button onClick={() => onMessage(item.audience, locations.find((location) => location.name === item.location)?.id ?? 1)}>Open draft</button></article>) : <div className="empty-state">No saved drafts yet. Drafts saved from profiles, services, locations, or portals will appear here.</div>}</div>}
+
     {section === "Settings" && <><div className="settings-grid"><article className="panel-card settings-panel"><div className="section-card-head"><div><h2>Company profile</h2><p>Fictional demonstration settings</p></div></div><label>Company name<input value={settings.company} onChange={(e) => setSettings({ ...settings, company: e.target.value })} /></label><label>Service area<input value={settings.serviceArea} onChange={(e) => setSettings({ ...settings, serviceArea: e.target.value })} /></label><label>Operations email<input value={settings.email} onChange={(e) => setSettings({ ...settings, email: e.target.value })} /></label><label>Default timezone<select value={settings.timezone} onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}><option>Eastern Time</option><option>Central Time</option><option>Pacific Time</option></select></label></article><article className="panel-card settings-panel"><div className="section-card-head"><div><h2>Pay and notifications</h2><p>Demo workspace preferences</p></div></div><label>Default pay method<select value={settings.defaultPay} onChange={(e) => setSettings({ ...settings, defaultPay: e.target.value })}><option>Hourly</option><option>Flat rate</option><option>Percent of job</option><option>Monthly</option><option>Semimonthly</option></select></label><label className="toggle-row"><span><strong>Email status updates</strong><small>Send fictional operations summaries</small></span><input type="checkbox" checked={settings.emailUpdates} onChange={(e) => setSettings({ ...settings, emailUpdates: e.target.checked })} /></label><label className="toggle-row"><span><strong>Automatic service reminders</strong><small>Remind assigned cleaners before visits</small></span><input type="checkbox" checked={settings.autoReminders} onChange={(e) => setSettings({ ...settings, autoReminders: e.target.checked })} /></label><div className="settings-saved">Changes apply to this demo session only.</div></article></div><div className="settings-actions"><button className="primary-button" onClick={() => { setSettingsConfirmed(true); showToast("Demo settings saved for this session"); }}>Save Changes</button>{settingsConfirmed && <span role="status">✓ Settings saved for this demo session.</span>}</div></>}
 
     {modal && selected && draft && <div className="modal-backdrop" onMouseDown={(e) => { if (e.currentTarget === e.target) closeDetails(); }}><section className="record-modal" role="dialog" aria-modal="true" aria-labelledby="record-title"><div className="modal-header"><div><span className="calculator-mark">{modal.kind === "cleaner" ? "◎" : modal.kind === "client" ? "○" : "▥"}</span><div><p>{modal.kind.toUpperCase()} DETAILS</p><h2 id="record-title">{selected.name}</h2></div></div><button onClick={closeDetails} aria-label={`Close ${modal.kind} details`}>×</button></div>
@@ -179,7 +193,7 @@ function SectionView({ section, locations, setLocations, cleaners, setCleaners, 
           {modal.kind === "cleaner" && <><label>Name<input value={draft.name} onChange={(e) => updateDraft("name", e.target.value)} /></label><label>Email<input value={draft.email} onChange={(e) => updateDraft("email", e.target.value)} /></label><label>Phone<input value={draft.phone} onChange={(e) => updateDraft("phone", e.target.value)} /></label><label>Availability<input value={draft.availability} onChange={(e) => updateDraft("availability", e.target.value)} /></label><label>Assigned location<select value={draft.location} onChange={(e) => updateDraft("location", e.target.value)}>{locations.map((location) => <option key={location.id}>{location.name}</option>)}</select></label><label>Service time<input value={draft.shift} onChange={(e) => updateDraft("shift", e.target.value)} /></label><label className="full">Pay method<input value={draft.payMethod} onChange={(e) => updateDraft("payMethod", e.target.value)} /></label></>}
           {modal.kind === "client" && <><label>Name<input value={draft.name} onChange={(e) => updateDraft("name", e.target.value)} /></label><label>Email<input value={draft.email} onChange={(e) => updateDraft("email", e.target.value)} /></label><label>Phone<input value={draft.phone} onChange={(e) => updateDraft("phone", e.target.value)} /></label><label>Linked location<select value={draft.location} onChange={(e) => updateDraft("location", e.target.value)}>{locations.map((location) => <option key={location.id}>{location.name}</option>)}</select></label><label className="full">Notes<textarea value={draft.notes} onChange={(e) => updateDraft("notes", e.target.value)} /></label></>}
         </div>}
-      </div><div className="modal-actions">{editing ? <><button onClick={cancelEdit}>Cancel</button><button onClick={saveEdit}>Save</button></> : <><button onClick={closeDetails}>Close</button><button onClick={() => setEditing(true)}>Edit {modal.kind === "service" ? "Service" : modal.kind[0].toUpperCase() + modal.kind.slice(1)}</button></>}</div></section></div>}
+      </div><div className="modal-actions">{editing ? <><button onClick={cancelEdit}>Cancel</button><button onClick={saveEdit}>Save</button></> : <><button onClick={closeDetails}>Close</button><button onClick={() => onMessage("cleaner", modal.kind === "service" || modal.kind === "location" ? selected.id : locations.find((item) => item.name === selected.location)?.id ?? 1)}>Message Cleaner</button><button onClick={() => onMessage("client", modal.kind === "service" || modal.kind === "location" ? selected.id : locations.find((item) => item.name === selected.location)?.id ?? 1)}>Message Client</button><button onClick={() => setEditing(true)}>Edit {modal.kind === "service" ? "Service" : modal.kind[0].toUpperCase() + modal.kind.slice(1)}</button></>}</div></section></div>}
   </div>;
 }
 
@@ -189,6 +203,15 @@ export default function Home() {
   const [clients, setClients] = useState(initialClients);
   const [settings, setSettings] = useState(initialSettings);
   const [activeNav, setActiveNav] = useState("Dashboard");
+  const [role, setRole] = useState<DemoRole>("Owner/Admin");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [drafts, setDrafts] = useState<DraftRecord[]>([]);
+  const [jobOpen, setJobOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState<"jobs" | "completed" | "revenue" | "cleaners" | null>(null);
+  const [checklist, setChecklist] = useState([false, false, false, false]);
+  const [portalPhoto, setPortalPhoto] = useState(false);
+  const [newJob, setNewJob] = useState(initialJobDraft);
   const [payOpen, setPayOpen] = useState(false);
   const [mode, setMode] = useState<PayMode>("Hourly");
   const [hours, setHours] = useState(6.5);
@@ -239,8 +262,34 @@ export default function Home() {
       : `Hi ${location.cleaner},\n\nI’m following up about your service at ${location.name}, currently marked ${location.status}.\n\nService window: ${location.time}\nLocation: ${location.address}\nNotes: ${location.notes}\n\nPlease reply to confirm you received this update and let me know whether any schedule or service details need to be corrected.\n\nThank you,\nAvery`;
     setMessageText(text);
     setMessageOpen(true);
-    addActivity({ icon: "✦", color: "teal-bg", title: `${audience === "client" ? "Client" : "Cleaner"} message drafted for ${location.name}`, detail: `${location.status} service · ${location.cleaner}`, time: "Just now", reason: location.notes });
   };
+
+  const saveDraft = () => {
+    const recipient = messageAudience === "client" ? selectedLocation.client : selectedLocation.cleaner;
+    const saved: DraftRecord = { id: Date.now(), audience: messageAudience, recipient, location: selectedLocation.name, status: selectedLocation.status, time: "Today · Just now", reason: selectedLocation.notes, body: messageText };
+    setDrafts((current) => [saved, ...current]);
+    addActivity({ icon: "✦", color: "teal-bg", title: `${messageAudience === "client" ? "Client" : "Cleaner"} draft saved for ${recipient}`, detail: `${selectedLocation.name} · ${selectedLocation.status}`, time: "Just now", reason: selectedLocation.notes });
+    setMessageOpen(false); showToast("Draft saved to Communication Center");
+  };
+
+  const portalAction = (title: string, reason: string) => { addActivity({ icon: "✓", color: "teal-bg", title, detail: role, time: "Just now", reason }); showToast(title); };
+  const saveJob = () => {
+    const cleaner = cleaners.find((item) => item.name === newJob.cleaner) ?? cleaners[0];
+    const client = clients.find((item) => item.name === newJob.client) ?? clients[0];
+    const next: LocationRecord = { id: Date.now(), name: `${newJob.location} · Extra Service`, address: locations.find((item) => item.name === newJob.location)?.address ?? "100 Demo Way", client: client.name, time: `${newJob.start}–${newJob.end}`, cleaner: cleaner.name, initials: cleaner.initials, value: Number(newJob.value), status: newJob.status, detail: `One-time service · ${newJob.date}`, notes: `${newJob.instructions} ${newJob.notes}`, color: "blue" };
+    setLocations((current) => [...current, next]); setJobOpen(false); setNewJob({ ...initialJobDraft });
+    addActivity({ icon: "+", color: "blue-bg", title: `Job added for ${next.name}`, detail: `${next.cleaner} · ${next.time}`, time: "Just now", reason: newJob.instructions }); showToast("New fictional job saved");
+  };
+
+  const searchGroups = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase(); if (!q) return [];
+    return [
+      { label: "Locations", items: locations.filter((item) => `${item.name} ${item.address}`.toLowerCase().includes(q)).map((item) => ({ title: item.name, detail: item.address, nav: "Locations" })) },
+      { label: "Cleaners", items: cleaners.filter((item) => `${item.name} ${item.location}`.toLowerCase().includes(q)).map((item) => ({ title: item.name, detail: item.location, nav: "Team" })) },
+      { label: "Clients", items: clients.filter((item) => `${item.name} ${item.location}`.toLowerCase().includes(q)).map((item) => ({ title: item.name, detail: item.location, nav: "Clients" })) },
+      { label: "Services & jobs", items: locations.filter((item) => `${item.name} ${item.cleaner} ${item.status} ${item.detail}`.toLowerCase().includes(q)).map((item) => ({ title: `${item.name} service`, detail: `${item.time} · ${item.status}`, nav: "Schedule" })) },
+    ].filter((group) => group.items.length);
+  }, [searchQuery, locations, cleaners, clients]);
 
   const setStatus = (id: number, status: ServiceStatus) => {
     setLocations((current) => current.map((location) => location.id === id ? { ...location, status } : location));
@@ -250,8 +299,18 @@ export default function Home() {
   };
 
   const navItems = [
-    ["Dashboard", "⌂"], ["Schedule", "▦"], ["Locations", "◇"], ["Team", "◎"], ["Clients", "○"], ["Reports", "↗"],
+    ["Dashboard", "⌂"], ["Schedule", "▦"], ["Locations", "◇"], ["Team", "◎"], ["Clients", "○"], ["Reports", "↗"], ["Communications", "✦"],
   ];
+
+  if (role === "Cleaner") {
+    const cleaner = cleaners[0]; const job = locations.find((item) => item.cleaner === cleaner.name) ?? locations[0];
+    return <main className="portal-shell"><header className="portal-top"><div className="brand"><span className="brand-mark">C</span><span>CleanFlow <b>AI</b></span></div><div className="role-switch"><label>Switch Demo Role<select value={role} onChange={(e) => setRole(e.target.value as DemoRole)}><option>Owner/Admin</option><option>Cleaner</option><option>Client/School</option></select></label></div></header><div className="portal-content"><div className="portal-heading"><div><p className="eyebrow">CLEANER DEMO PORTAL</p><h1>Welcome, {cleaner.name}</h1><p>Only your fictional assignment and pay estimate are shown.</p></div><button className="secondary-button" onClick={() => setRole("Owner/Admin")}>Return to Owner/Admin</button></div><div className="fictional-notice"><span>i</span>All names and information shown are fictional demonstration data.</div><section className="portal-grid"><article className="panel-card portal-job"><div className="section-card-head"><div><h2>Today’s assigned job</h2><p>{job.time} · {job.status}</p></div><span className={`section-status ${statusStyles[job.status]}`}>{job.status}</span></div><div className="portal-job-body"><h2>{job.name}</h2><p>{job.address}</p><dl><div><dt>Service instructions</dt><dd>{job.detail}</dd></div><div><dt>Job notes</dt><dd>{job.notes}</dd></div><div><dt>Estimated pay</dt><dd>$176.00</dd></div></dl><div className="portal-actions">{["Check In","Start Service","Report Issue","Message Manager","Mark Complete"].map((action) => <button key={action} onClick={() => action === "Message Manager" ? draftMessage("client", job.id) : portalAction(`${cleaner.name}: ${action}`, `Cleaner action for ${job.name}.`)}>{action}</button>)}</div></div></article><article className="panel-card checklist-card"><h2>Cleaning checklist</h2>{["Entry and lobby","Work areas","Restrooms","Final walkthrough"].map((item, index) => <label key={item}><input type="checkbox" checked={checklist[index]} onChange={(e) => setChecklist((current) => current.map((value, i) => i === index ? e.target.checked : value))} />{item}</label>)}<button onClick={() => portalAction("Checklist completed", `Four-step checklist submitted for ${job.name}.`)}>Complete Checklist</button><div className="photo-demo"><span>{portalPhoto ? "▣" : "＋"}</span><p>{portalPhoto ? "Demo completion photo attached" : "No demonstration photo attached"}</p><button onClick={() => { setPortalPhoto(true); portalAction("Demo photo attached", `Mock photo placeholder added for ${job.name}.`); }}>Add Demo Photo</button></div></article></section></div>{messageOpen && <MessageOverlay audience={messageAudience} text={messageText} editing={messageEditing} setEditing={setMessageEditing} setText={setMessageText} onCopy={() => { navigator.clipboard.writeText(messageText); showToast("Draft copied"); }} onSave={saveDraft} onClose={() => setMessageOpen(false)} />}{toast && <div className="toast"><span>✓</span>{toast}</div>}</main>;
+  }
+
+  if (role === "Client/School") {
+    const client = clients[0]; const job = locations.find((item) => item.name === client.location) ?? locations[0];
+    return <main className="portal-shell"><header className="portal-top"><div className="brand"><span className="brand-mark">C</span><span>CleanFlow <b>AI</b></span></div><div className="role-switch"><label>Switch Demo Role<select value={role} onChange={(e) => setRole(e.target.value as DemoRole)}><option>Owner/Admin</option><option>Cleaner</option><option>Client/School</option></select></label></div></header><div className="portal-content"><div className="portal-heading"><div><p className="eyebrow">CLIENT / SCHOOL DEMO PORTAL</p><h1>{job.name}</h1><p>Welcome, {client.name}. Only your fictional location information is shown.</p></div><button className="secondary-button" onClick={() => setRole("Owner/Admin")}>Return to Owner/Admin</button></div><div className="fictional-notice"><span>i</span>All names and information shown are fictional demonstration data.</div><section className="portal-grid"><article className="panel-card portal-job"><div className="section-card-head"><div><h2>Upcoming cleaning schedule</h2><p>Today · {job.time}</p></div><span className={`section-status ${statusStyles[job.status]}`}>{job.status}</span></div><div className="portal-job-body"><h2>{job.name}</h2><p>{job.address}</p><dl><div><dt>Assigned cleaner</dt><dd>{job.cleaner}</dd></div><div><dt>Completed-service summary</dt><dd>24-point checklist · lobby glass spot-cleaned</dd></div><div><dt>Recent update</dt><dd>Service status confirmed today at 8:21 AM.</dd></div></dl><div className="portal-actions">{["Report a Problem","Request Extra Service","Message Company","Acknowledge Service Change"].map((action) => <button key={action} onClick={() => action === "Message Company" ? draftMessage("client", job.id) : portalAction(`${client.name}: ${action}`, `Client portal request for ${job.name}.`)}>{action}</button>)}</div></div></article><article className="panel-card client-update-card"><h2>Recent updates</h2><p><b>Today · 8:21 AM</b> Service checklist completed.</p><p><b>Yesterday · 3:10 PM</b> Schedule reminder confirmed.</p><button onClick={() => draftMessage("client", job.id)}>Message Company</button></article></section></div>{messageOpen && <MessageOverlay audience={messageAudience} text={messageText} editing={messageEditing} setEditing={setMessageEditing} setText={setMessageText} onCopy={() => { navigator.clipboard.writeText(messageText); showToast("Draft copied"); }} onSave={saveDraft} onClose={() => setMessageOpen(false)} />}{toast && <div className="toast"><span>✓</span>{toast}</div>}</main>;
+  }
 
   return (
     <main className="app-shell">
@@ -261,7 +320,7 @@ export default function Home() {
         <nav aria-label="Primary navigation">
           {navItems.map(([label, symbol]) => (
             <button key={label} onClick={() => setActiveNav(label)} className={activeNav === label ? "active" : ""}>
-              <Icon>{symbol}</Icon><span>{label}</span>{label === "Schedule" && <em>3</em>}
+              <Icon>{symbol}</Icon><span>{label}</span>{label === "Schedule" && <em>{locations.length}</em>}{label === "Communications" && drafts.length > 0 && <em>{drafts.length}</em>}
             </button>
           ))}
         </nav>
@@ -275,24 +334,24 @@ export default function Home() {
 
       <section className="main-panel">
         <header className="topbar">
-          <div className="search"><span>⌕</span><input aria-label="Search" placeholder="Search jobs, clients, cleaners…" /><kbd>⌘ K</kbd></div>
-          <div className="top-actions"><button className="icon-button" aria-label="Notifications" onClick={() => showToast("No new demo notifications")}>♢<i /></button><div className="profile"><span>AP</span><div><strong>Avery Patel</strong><small>Owner</small></div><b>⌄</b></div></div>
+          <div className="search-wrap"><div className="search"><span>⌕</span><input aria-label="Global search" placeholder="Search jobs, clients, cleaners…" value={searchQuery} onFocus={() => setSearchOpen(true)} onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }} /><kbd>⌘ K</kbd></div>{searchOpen && searchQuery && <div className="search-results" role="dialog" aria-label="Search results"><div className="search-result-head"><b>Search results</b><button onClick={() => setSearchOpen(false)} aria-label="Close search results">×</button></div>{searchGroups.length ? searchGroups.map((group) => <section key={group.label}><h3>{group.label}</h3>{group.items.map((item) => <button key={`${group.label}-${item.title}`} onClick={() => { setActiveNav(item.nav); setSearchOpen(false); }}><b>{item.title}</b><small>{item.detail}</small><span>→</span></button>)}</section>) : <div className="empty-state">No fictional locations, cleaners, clients, services, or jobs match “{searchQuery}”.</div>}</div>}</div>
+          <div className="top-actions"><div className="role-switch compact"><label>Switch Demo Role<select aria-label="Switch Demo Role" value={role} onChange={(e) => setRole(e.target.value as DemoRole)}><option>Owner/Admin</option><option>Cleaner</option><option>Client/School</option></select></label></div><button className="icon-button" aria-label="Notifications" onClick={() => showToast("No new demo notifications")}>♢<i /></button><div className="profile"><span>AP</span><div><strong>Avery Patel</strong><small>Owner/Admin</small></div></div></div>
         </header>
 
         <div className="content">
           {activeNav === "Dashboard" ? <>
           <div className="page-heading">
             <div><p className="eyebrow">SUNDAY, JULY 19</p><h1>Good morning, Avery.</h1><p>Here’s how Brightline Cleaning Co. is running today.</p></div>
-            <div className="heading-actions"><button className="secondary-button" onClick={() => setPayOpen(true)}>▣ &nbsp; Calculate pay</button><button className="primary-button" onClick={() => { setToast("New job draft created"); window.setTimeout(() => setToast(""), 2200); }}>＋ Add job</button></div>
+            <div className="heading-actions"><button className="secondary-button" onClick={() => setPayOpen(true)}>▣ &nbsp; Calculate pay</button><button className="primary-button" onClick={() => { setNewJob({ ...initialJobDraft }); setJobOpen(true); }}>＋ Add job</button></div>
           </div>
 
           <div className="fictional-notice" role="note"><span>i</span>All names and information shown are fictional demonstration data.</div>
 
           <section className="metrics" aria-label="Business overview">
-            <article><div className="metric-head"><span>Today’s jobs</span><b className="metric-icon blue">▦</b></div><strong>3</strong><p><i className="up">↑ 1</i> from last Sunday</p></article>
-            <article><div className="metric-head"><span>Completed</span><b className="metric-icon teal">✓</b></div><strong>{locations.filter((l) => l.status === "Completed").length}<small> / 3</small></strong><p>{Math.round((locations.filter((l) => l.status === "Completed").length / 3) * 100)}% completion rate</p></article>
-            <article><div className="metric-head"><span>Revenue today</span><b className="metric-icon violet">$</b></div><strong>${locations.filter((l) => l.status === "Completed").reduce((sum, l) => sum + l.value, 0).toLocaleString()}</strong><p><i className="up">↑ 8.4%</i> vs. weekly avg.</p></article>
-            <article><div className="metric-head"><span>Active cleaners</span><b className="metric-icon amber">◎</b></div><strong>3</strong><p><span className="live-dot" /> All checked in</p></article>
+            <article role="button" tabIndex={0} onClick={() => setSummaryOpen("jobs")}><div className="metric-head"><span>Today’s jobs</span><b className="metric-icon blue">▦</b></div><strong>{locations.length}</strong><p>Open today’s schedule</p></article>
+            <article role="button" tabIndex={0} onClick={() => setSummaryOpen("completed")}><div className="metric-head"><span>Completed</span><b className="metric-icon teal">✓</b></div><strong>{locations.filter((l) => l.status === "Completed").length}<small> / {locations.length}</small></strong><p>View completed services</p></article>
+            <article role="button" tabIndex={0} onClick={() => setSummaryOpen("revenue")}><div className="metric-head"><span>Revenue today</span><b className="metric-icon violet">$</b></div><strong>${locations.reduce((sum, l) => sum + l.value, 0).toLocaleString()}</strong><p>View fictional breakdown</p></article>
+            <article role="button" tabIndex={0} onClick={() => setSummaryOpen("cleaners")}><div className="metric-head"><span>Active cleaners</span><b className="metric-icon amber">◎</b></div><strong>{cleaners.length}</strong><p><span className="live-dot" /> View today’s team</p></article>
           </section>
 
           <section className="workspace-grid">
@@ -338,7 +397,7 @@ export default function Home() {
             <article className="panel-card revenue-card"><div className="card-title"><div><h2>Weekly revenue</h2><p>Service value by day</p></div><button onClick={() => showToast("Showing this fictional week")}>This week ⌄</button></div><div className="revenue-top"><strong>$4,860</strong><span>↑ 12.6%</span><small>vs. last week</small></div><div className="chart"><i style={{height:"42%"}} /><i style={{height:"63%"}} /><i style={{height:"54%"}} /><i style={{height:"78%"}} /><i style={{height:"71%"}} /><i style={{height:"92%"}} /><i className="today" style={{height:"46%"}} /></div><div className="chart-labels"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div></article>
             <article className="panel-card activity-card"><div className="card-title"><div><h2>Recent activity</h2><p>Live team updates</p></div><button onClick={() => setActivityOpen(true)}>See all</button></div><ul>{activity.slice(0, 3).map((item) => <li key={item.id}><span className={item.color}>{item.icon}</span><p><strong>{item.title}</strong><small>{item.detail} · {item.time}</small></p></li>)}</ul></article>
           </section>
-          </> : <SectionView section={activeNav} locations={locations} setLocations={setLocations} cleaners={cleaners} setCleaners={setCleaners} clients={clients} setClients={setClients} settings={settings} setSettings={setSettings} onBack={() => setActiveNav("Dashboard")} onOpenPay={() => setPayOpen(true)} showToast={showToast} />}
+          </> : <SectionView section={activeNav} locations={locations} setLocations={setLocations} cleaners={cleaners} setCleaners={setCleaners} clients={clients} setClients={setClients} settings={settings} setSettings={setSettings} drafts={drafts} onBack={() => setActiveNav("Dashboard")} onOpenPay={() => setPayOpen(true)} onMessage={draftMessage} onActivity={addActivity} showToast={showToast} />}
         </div>
       </section>
 
@@ -376,9 +435,13 @@ export default function Home() {
           </div>
           <div className="message-facts"><span><b>Status</b>{selectedLocation.status}</span><span><b>Cleaner</b>{selectedLocation.cleaner}</span><span><b>Notes</b>{selectedLocation.notes}</span></div>
           <textarea className="message-editor" aria-label="Drafted message" readOnly={!messageEditing} value={messageText} onChange={(e) => setMessageText(e.target.value)} />
-          <div className="message-actions"><button onClick={() => { navigator.clipboard.writeText(messageText); showToast("Draft copied to clipboard"); }}>Copy</button><button className={messageEditing ? "editing" : ""} onClick={() => setMessageEditing((value) => !value)}>{messageEditing ? "Done editing" : "Edit"}</button><button onClick={() => setMessageOpen(false)}>Close</button></div>
+          <div className="message-actions"><button onClick={() => { navigator.clipboard.writeText(messageText); showToast("Draft copied to clipboard"); }}>Copy</button><button className={messageEditing ? "editing" : ""} onClick={() => setMessageEditing((value) => !value)}>{messageEditing ? "Done editing" : "Edit"}</button><button onClick={() => setMessageEditing(false)}>Cancel</button><button onClick={saveDraft}>Save Draft</button><button onClick={() => setMessageOpen(false)}>Close</button></div>
         </section>
       </div>}
+
+      {jobOpen && <div className="modal-backdrop"><section className="record-modal" role="dialog" aria-modal="true" aria-label="New Job"><div className="modal-header"><div><span className="calculator-mark">＋</span><div><p>FICTIONAL JOB</p><h2>New Job</h2></div></div><button onClick={() => setJobOpen(false)} aria-label="Close New Job">×</button></div><div className="record-body record-form"><label>Client<select value={newJob.client} onChange={(e) => setNewJob({ ...newJob, client: e.target.value })}>{clients.map((item) => <option key={item.id}>{item.name}</option>)}</select></label><label>Location<select value={newJob.location} onChange={(e) => setNewJob({ ...newJob, location: e.target.value })}>{initialLocations.map((item) => <option key={item.id}>{item.name}</option>)}</select></label><label>Service date<input type="date" value={newJob.date} onChange={(e) => setNewJob({ ...newJob, date: e.target.value })} /></label><label>Start time<input value={newJob.start} onChange={(e) => setNewJob({ ...newJob, start: e.target.value })} /></label><label>End time<input value={newJob.end} onChange={(e) => setNewJob({ ...newJob, end: e.target.value })} /></label><label>Assigned cleaner<select value={newJob.cleaner} onChange={(e) => setNewJob({ ...newJob, cleaner: e.target.value })}>{cleaners.map((item) => <option key={item.id}>{item.name}</option>)}</select></label><label>Service value<input type="number" value={newJob.value} onChange={(e) => setNewJob({ ...newJob, value: Number(e.target.value) })} /></label><label>Status<select value={newJob.status} onChange={(e) => setNewJob({ ...newJob, status: e.target.value as ServiceStatus })}><option>Completed</option><option>Missed</option><option>Client Closed</option></select></label><label className="full">Service instructions<textarea value={newJob.instructions} onChange={(e) => setNewJob({ ...newJob, instructions: e.target.value })} /></label><label className="full">Internal notes<textarea value={newJob.notes} onChange={(e) => setNewJob({ ...newJob, notes: e.target.value })} /></label></div><div className="modal-actions"><button onClick={() => setJobOpen(false)}>Cancel</button><button onClick={saveJob}>Save Job</button></div></section></div>}
+
+      {summaryOpen && <div className="modal-backdrop"><section className="activity-modal summary-modal" role="dialog" aria-modal="true" aria-label={`${summaryOpen} summary`}><div className="modal-header"><div><span className="calculator-mark">{summaryOpen === "revenue" ? "$" : summaryOpen === "cleaners" ? "◎" : "▦"}</span><div><p>DASHBOARD DETAIL</p><h2>{summaryOpen === "jobs" ? "Today’s Jobs" : summaryOpen === "completed" ? "Completed Services" : summaryOpen === "revenue" ? "Revenue Today" : "Active Cleaners"}</h2></div></div><button onClick={() => setSummaryOpen(null)} aria-label="Close summary">×</button></div><div className="summary-list">{summaryOpen === "cleaners" ? cleaners.map((item) => <article key={item.id}><b>{item.name}</b><span>{item.location}</span><small>{item.shift} · {item.availability}</small></article>) : locations.filter((item) => summaryOpen !== "completed" || item.status === "Completed").map((item) => <article key={item.id}><b>{item.name}</b><span>{summaryOpen === "revenue" ? `$${item.value} fictional service value` : `${item.cleaner} · ${item.time}`}</span><small>{summaryOpen === "completed" ? `Completed at 8:21 AM · Checklist complete · ${item.notes}` : `${item.status} · ${item.notes}`}</small></article>)}</div>{summaryOpen === "revenue" && <div className="summary-total"><span>Total fictional revenue</span><b>${locations.reduce((sum, item) => sum + item.value, 0).toLocaleString()}</b></div>}<div className="modal-actions"><button onClick={() => setSummaryOpen(null)}>Close</button><button onClick={() => { setSummaryOpen(null); setActiveNav(summaryOpen === "revenue" ? "Reports" : summaryOpen === "cleaners" ? "Team" : "Schedule"); }}>{summaryOpen === "revenue" ? "Open Reports" : summaryOpen === "cleaners" ? "View Cleaner Profiles" : "View Full Schedule"}</button></div></section></div>}
 
       {activityOpen && <div className="modal-backdrop" onMouseDown={(e) => { if (e.currentTarget === e.target) setActivityOpen(false); }}>
         <section className="activity-modal" role="dialog" aria-modal="true" aria-labelledby="activity-title">
