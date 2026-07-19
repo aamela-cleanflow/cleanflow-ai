@@ -77,6 +77,60 @@ function Icon({ children }: { children: React.ReactNode }) {
   return <span className="nav-icon" aria-hidden="true">{children}</span>;
 }
 
+function SectionView({ section, locations, onBack, onNavigate, onOpenPay }: {
+  section: string;
+  locations: typeof initialLocations;
+  onBack: () => void;
+  onNavigate: (section: string) => void;
+  onOpenPay: () => void;
+}) {
+  const [emailUpdates, setEmailUpdates] = useState(true);
+  const [autoReminders, setAutoReminders] = useState(true);
+  const [defaultPay, setDefaultPay] = useState("Hourly");
+  const sectionCopy: Record<string, { eyebrow: string; title: string; description: string }> = {
+    Schedule: { eyebrow: "OPERATIONS", title: "Service schedule", description: "Today’s three fictional commercial cleaning visits." },
+    Locations: { eyebrow: "SERVICE DIRECTORY", title: "Commercial locations", description: "Fictional location details and recurring service plans." },
+    Team: { eyebrow: "CREW DIRECTORY", title: "Cleaning team", description: "Fictional cleaners and their assigned service locations." },
+    Clients: { eyebrow: "CLIENT DIRECTORY", title: "Client contacts", description: "Fictional contacts connected to each demonstration location." },
+    Reports: { eyebrow: "PERFORMANCE", title: "Operations summary", description: "Fictional service, pay, and revenue information for this demo." },
+    "Help center": { eyebrow: "DEMO SUPPORT", title: "Help center", description: "A quick guide to the main CleanFlow AI prototype features." },
+    Settings: { eyebrow: "DEMO PREFERENCES", title: "Company settings", description: "Fictional business settings and cleaner pay preferences." },
+  };
+  const copy = sectionCopy[section] ?? sectionCopy.Schedule;
+  const cleanerDetails = [
+    { name: "Maya Chen", initials: "MC", role: "Lead cleaner", location: "Harbor Point Offices", shift: "6:00–8:30 AM", rate: "$24/hr", color: "blue" },
+    { name: "Luis Rivera", initials: "LR", role: "Commercial cleaner", location: "Juniper Health Center", shift: "12:30–3:00 PM", rate: "$22/hr", color: "teal" },
+    { name: "Nia Brooks", initials: "NB", role: "Evening specialist", location: "Northstar Learning Hub", shift: "5:30–8:00 PM", rate: "$155 flat", color: "violet" },
+  ];
+  const clientDetails = [
+    { name: "Jordan Ellis", title: "Facilities coordinator", company: "Harbor Point Offices", contact: "jordan.ellis@example.test", phone: "(555) 010-1840" },
+    { name: "Priya Shah", title: "Practice administrator", company: "Juniper Health Center", contact: "priya.shah@example.test", phone: "(555) 010-2272" },
+    { name: "Marcus Bell", title: "Operations director", company: "Northstar Learning Hub", contact: "marcus.bell@example.test", phone: "(555) 010-3905" },
+  ];
+
+  return <div className="section-view">
+    <div className="section-heading">
+      <div><p className="eyebrow">{copy.eyebrow}</p><h1>{copy.title}</h1><p>{copy.description}</p></div>
+      <button className="secondary-button back-dashboard" onClick={onBack}>← Back to Dashboard</button>
+    </div>
+    <div className="fictional-notice" role="note"><span>i</span>All names and information shown are fictional demonstration data.</div>
+
+    {section === "Schedule" && <div className="section-card panel-card"><div className="section-card-head"><div><h2>Sunday, July 19</h2><p>3 scheduled services · 7.5 crew hours</p></div><span className="section-pill">Today</span></div><div className="schedule-list">{locations.map((location, index) => <article key={location.id}><div className="schedule-time"><strong>{location.time}</strong><small>Stop {index + 1}</small></div><div className={`location-symbol ${location.color}`}>▥</div><div className="schedule-main"><h3>{location.name}</h3><p>{location.address}</p><small>{location.detail}</small></div><div className="schedule-cleaner"><span>{location.initials}</span><div><strong>{location.cleaner}</strong><small>Assigned cleaner</small></div></div><span className={`section-status ${statusStyles[location.status]}`}>{location.status}</span><div className="schedule-notes"><b>Fictional notes</b><p>{location.notes}</p></div></article>)}</div></div>}
+
+    {section === "Locations" && <div className="directory-grid">{locations.map((location) => <article className="directory-card panel-card" key={location.id}><div className="directory-top"><div className={`location-symbol ${location.color}`}>▥</div><span className={`section-status ${statusStyles[location.status]}`}>{location.status}</span></div><h2>{location.name}</h2><p>{location.address}</p><dl><div><dt>Service plan</dt><dd>{location.detail}</dd></div><div><dt>Today’s window</dt><dd>{location.time}</dd></div><div><dt>Assigned cleaner</dt><dd>{location.cleaner}</dd></div><div><dt>Service value</dt><dd>${location.value}</dd></div></dl><button onClick={() => onNavigate("Schedule")}>View in schedule →</button></article>)}</div>}
+
+    {section === "Team" && <div className="directory-grid team-grid">{cleanerDetails.map((cleaner) => <article className="directory-card panel-card" key={cleaner.name}><div className="team-avatar">{cleaner.initials}</div><h2>{cleaner.name}</h2><p>{cleaner.role}</p><dl><div><dt>Assigned today</dt><dd>{cleaner.location}</dd></div><div><dt>Service time</dt><dd>{cleaner.shift}</dd></div><div><dt>Demo pay method</dt><dd>{cleaner.rate}</dd></div><div><dt>Availability</dt><dd><i className="live-dot" /> Checked in</dd></div></dl></article>)}</div>}
+
+    {section === "Clients" && <div className="client-table panel-card"><div className="table-head"><span>Contact</span><span>Location</span><span>Email</span><span>Phone</span></div>{clientDetails.map((client) => <article key={client.name}><div className="client-name"><span>{client.name.split(" ").map((part) => part[0]).join("")}</span><div><strong>{client.name}</strong><small>{client.title}</small></div></div><strong>{client.company}</strong><a href={`mailto:${client.contact}`}>{client.contact}</a><a href={`tel:${client.phone.replace(/\D/g, "")}`}>{client.phone}</a></article>)}</div>}
+
+    {section === "Reports" && <><div className="report-metrics"><article className="panel-card"><span>Completed services</span><strong>18</strong><p>78% of scheduled visits</p></article><article className="panel-card"><span>Missed services</span><strong>2</strong><p>8.7% of scheduled visits</p></article><article className="panel-card"><span>Client Closed</span><strong>3</strong><p>13% of scheduled visits</p></article><article className="panel-card"><span>Fictional revenue</span><strong>$4,860</strong><p>↑ 12.6% from prior week</p></article></div><div className="reports-grid"><article className="panel-card report-summary"><h2>Weekly service summary</h2><div><span>Completed</span><b>18</b></div><div><span>Missed</span><b>2</b></div><div><span>Client Closed</span><b>3</b></div><div className="report-total"><span>Total scheduled</span><b>23</b></div></article><article className="panel-card report-summary"><h2>Pay and revenue</h2><div><span>Estimated cleaner pay</span><b>$2,940</b></div><div><span>Service revenue</span><b>$4,860</b></div><div><span>Gross difference</span><b>$1,920</b></div><div className="report-total"><span>Pay as % of revenue</span><b>60.5%</b></div><button onClick={onOpenPay}>Open pay calculator</button></article></div></>}
+
+    {section === "Help center" && <div className="help-grid"><article className="panel-card help-intro"><div className="help-mark">?</div><h2>CleanFlow AI demo guide</h2><p>Use the dashboard to review service status, update locations, draft messages, calculate cleaner pay, and inspect the fictional activity log.</p></article><article className="panel-card help-list"><div><span>1</span><p><strong>Manage today’s services</strong><small>Use each location’s status menu to mark Completed, Missed, or Client Closed.</small></p></div><div><span>2</span><p><strong>Draft clear updates</strong><small>CleanFlow AI prepares editable messages for fictional clients and cleaners.</small></p></div><div><span>3</span><p><strong>Estimate cleaner pay</strong><small>Compare hourly, flat, percentage, monthly, and semimonthly methods.</small></p></div><div><span>4</span><p><strong>Review the audit trail</strong><small>See fictional status changes, drafts, and saved estimates in Recent activity.</small></p></div></article></div>}
+
+    {section === "Settings" && <div className="settings-grid"><article className="panel-card settings-panel"><div className="section-card-head"><div><h2>Company profile</h2><p>Fictional demonstration settings</p></div></div><label>Company name<input value="Brightline Cleaning Co." readOnly /></label><label>Service area<input value="Harbor City Metro" readOnly /></label><label>Operations email<input value="ops@brightline-demo.example" readOnly /></label><label>Default timezone<select defaultValue="Eastern Time"><option>Eastern Time</option><option>Central Time</option><option>Pacific Time</option></select></label></article><article className="panel-card settings-panel"><div className="section-card-head"><div><h2>Pay and notifications</h2><p>Demo workspace preferences</p></div></div><label>Default pay method<select value={defaultPay} onChange={(e) => setDefaultPay(e.target.value)}><option>Hourly</option><option>Flat rate</option><option>Percent of job</option><option>Monthly</option><option>Semimonthly</option></select></label><label className="toggle-row"><span><strong>Email status updates</strong><small>Send fictional operations summaries</small></span><input type="checkbox" checked={emailUpdates} onChange={(e) => setEmailUpdates(e.target.checked)} /></label><label className="toggle-row"><span><strong>Automatic service reminders</strong><small>Remind assigned cleaners before visits</small></span><input type="checkbox" checked={autoReminders} onChange={(e) => setAutoReminders(e.target.checked)} /></label><div className="settings-saved">Changes apply to this demo session only.</div></article></div>}
+  </div>;
+}
+
 export default function Home() {
   const [locations, setLocations] = useState(initialLocations);
   const [activeNav, setActiveNav] = useState("Dashboard");
@@ -158,8 +212,8 @@ export default function Home() {
         </nav>
         <div className="sidebar-bottom">
           <button onClick={() => setPayOpen(true)}><Icon>$</Icon><span>Pay calculator</span></button>
-          <button><Icon>?</Icon><span>Help center</span></button>
-          <button><Icon>⚙</Icon><span>Settings</span></button>
+          <button onClick={() => setActiveNav("Help center")} className={activeNav === "Help center" ? "active" : ""}><Icon>?</Icon><span>Help center</span></button>
+          <button onClick={() => setActiveNav("Settings")} className={activeNav === "Settings" ? "active" : ""}><Icon>⚙</Icon><span>Settings</span></button>
           <div className="demo-note"><span>DEMO WORKSPACE</span><p>All names, jobs, and figures are fictional.</p></div>
         </div>
       </aside>
@@ -171,6 +225,7 @@ export default function Home() {
         </header>
 
         <div className="content">
+          {activeNav === "Dashboard" ? <>
           <div className="page-heading">
             <div><p className="eyebrow">SUNDAY, JULY 19</p><h1>Good morning, Avery.</h1><p>Here’s how Brightline Cleaning Co. is running today.</p></div>
             <div className="heading-actions"><button className="secondary-button" onClick={() => setPayOpen(true)}>▣ &nbsp; Calculate pay</button><button className="primary-button" onClick={() => { setToast("New job draft created"); window.setTimeout(() => setToast(""), 2200); }}>＋ Add job</button></div>
@@ -187,7 +242,7 @@ export default function Home() {
 
           <section className="workspace-grid">
             <div className="locations-card panel-card">
-              <div className="card-title"><div><h2>Today’s service locations</h2><p>Three commercial locations on the schedule</p></div><button>View schedule <span>→</span></button></div>
+              <div className="card-title"><div><h2>Today’s service locations</h2><p>Three commercial locations on the schedule</p></div><button onClick={() => setActiveNav("Schedule")}>View schedule <span>→</span></button></div>
               <div className="location-list">
                 {locations.map((location) => (
                   <article className="location-row" key={location.id}>
@@ -228,6 +283,7 @@ export default function Home() {
             <article className="panel-card revenue-card"><div className="card-title"><div><h2>Weekly revenue</h2><p>Service value by day</p></div><button>This week ⌄</button></div><div className="revenue-top"><strong>$4,860</strong><span>↑ 12.6%</span><small>vs. last week</small></div><div className="chart"><i style={{height:"42%"}} /><i style={{height:"63%"}} /><i style={{height:"54%"}} /><i style={{height:"78%"}} /><i style={{height:"71%"}} /><i style={{height:"92%"}} /><i className="today" style={{height:"46%"}} /></div><div className="chart-labels"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div></article>
             <article className="panel-card activity-card"><div className="card-title"><div><h2>Recent activity</h2><p>Live team updates</p></div><button onClick={() => setActivityOpen(true)}>See all</button></div><ul>{activity.slice(0, 3).map((item) => <li key={item.id}><span className={item.color}>{item.icon}</span><p><strong>{item.title}</strong><small>{item.detail} · {item.time}</small></p></li>)}</ul></article>
           </section>
+          </> : <SectionView section={activeNav} locations={locations} onBack={() => setActiveNav("Dashboard")} onNavigate={setActiveNav} onOpenPay={() => setPayOpen(true)} />}
         </div>
       </section>
 
