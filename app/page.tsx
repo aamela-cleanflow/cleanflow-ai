@@ -128,7 +128,7 @@ function ProblemOverlay({ description, photo, setDescription, setPhoto, onSubmit
   return <div className="modal-backdrop"><section className="message-modal" role="dialog" aria-modal="true" aria-label="Report a Problem"><div className="modal-header"><div><span className="calculator-mark">!</span><div><p>CLIENT DEMO REQUEST</p><h2>Report a Problem</h2></div></div><button onClick={onClose} aria-label="Close problem report">×</button></div><div className="problem-form"><label>Short description<textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the fictional service issue…" /></label><div className="demo-upload"><p>{photo ? "✓ Demo photos uploaded" : "No demo photos uploaded"}</p><button onClick={() => setPhoto(true)}>Upload Demo Photos</button></div><small>Uploads and reports remain fictional demonstration data.</small></div><div className="modal-actions"><button onClick={onClose}>Cancel</button><button onClick={onSubmit}>Submit Report</button></div></section></div>;
 }
 
-function SectionView({ section, locations, setLocations, cleaners, setCleaners, clients, setClients, settings, setSettings, drafts, archivedDraftIds, onArchiveDraft, onDeleteDraft, onBack, onOpenPay, onMessage, onActivity, showToast }: {
+function SectionView({ section, locations, setLocations, cleaners, setCleaners, clients, setClients, settings, setSettings, drafts, archivedDraftIds, onArchiveDraft, onDeleteDraft, onSaveReply, onBack, onOpenPay, onMessage, onActivity, showToast }: {
   section: string;
   locations: LocationRecord[];
   setLocations: React.Dispatch<React.SetStateAction<LocationRecord[]>>;
@@ -142,6 +142,7 @@ function SectionView({ section, locations, setLocations, cleaners, setCleaners, 
   archivedDraftIds: number[];
   onArchiveDraft: (id: number) => void;
   onDeleteDraft: (id: number) => void;
+  onSaveReply: (source: DraftRecord, reply: string) => void;
   onBack: () => void;
   onOpenPay: () => void;
   onMessage: (audience: MessageAudience, locationId: number) => void;
@@ -154,6 +155,8 @@ function SectionView({ section, locations, setLocations, cleaners, setCleaners, 
   const [openGuide, setOpenGuide] = useState<number | null>(null);
   const [settingsConfirmed, setSettingsConfirmed] = useState(false);
   const [threadDraft, setThreadDraft] = useState<DraftRecord | null>(null);
+  const [replyDraft, setReplyDraft] = useState<DraftRecord | null>(null);
+  const [replyText, setReplyText] = useState("");
   const sectionCopy: Record<string, { eyebrow: string; title: string; description: string }> = {
     Schedule: { eyebrow: "OPERATIONS", title: "Service schedule", description: "Today’s three fictional commercial cleaning visits." },
     Locations: { eyebrow: "SERVICE DIRECTORY", title: "Commercial locations", description: "Fictional location details and recurring service plans." },
@@ -185,6 +188,10 @@ function SectionView({ section, locations, setLocations, cleaners, setCleaners, 
     ["Estimate cleaner pay", "Compare hourly, flat, percentage, monthly, and semimonthly methods. Saved estimates appear in Recent activity."],
     ["Review the audit trail", "Open Recent activity to see fictional status changes, drafted messages, pay calculations, timestamps, and reasons."],
   ];
+  const openReply = (item: DraftRecord) => {
+    setReplyDraft(item);
+    setReplyText(`Hello ${item.recipient},\n\nThank you for your message about ${item.location}. We’ve reviewed the ${item.status.toLowerCase()} service update and are following up on the next appropriate step.\n\nBest,\nAvery\nBrightline Cleaning Co.`);
+  };
 
   return <div className="section-view">
     <div className="section-heading">
@@ -205,9 +212,11 @@ function SectionView({ section, locations, setLocations, cleaners, setCleaners, 
 
     {section === "Help center" && <div className="help-grid"><article className="panel-card help-intro"><div className="help-mark">?</div><h2>CleanFlow AI demo guide</h2><p>Use the dashboard to review service status, update locations, draft messages, calculate cleaner pay, and inspect the fictional activity log.</p></article><article className="panel-card help-list">{guides.map(([title, explanation], index) => <div className={openGuide === index ? "guide-open" : ""} key={title}><button aria-expanded={openGuide === index} onClick={() => setOpenGuide(openGuide === index ? null : index)}><span>{index + 1}</span><p><strong>{title}</strong><small>{openGuide === index ? explanation : "Select to learn more"}</small></p><b>{openGuide === index ? "−" : "+"}</b></button></div>)}</article></div>}
 
-    {section === "Communications" && <div className="panel-card communication-list"><div className="section-card-head"><div><h2>Demo communication inbox</h2><p>{drafts.length} fictional conversations · replies are never sent</p></div></div>{drafts.length ? drafts.map((item) => <article className={archivedDraftIds.includes(item.id) ? "archived" : ""} key={item.id}><span className={`draft-kind ${item.audience}`}>{item.audience === "client" ? "Client" : "Cleaner"}</span><div><h3>{item.recipient}<span className={`message-status ${item.messageStatus.toLowerCase()}`}>{item.messageStatus}</span>{archivedDraftIds.includes(item.id) && <em>Archived</em>}</h3><p>{item.location} · {item.status}</p><small>{item.time} · Reason: {item.reason}</small></div><div className="inbox-actions"><button onClick={() => onMessage(item.audience, locations.find((location) => location.name === item.location)?.id ?? 1)}>Reply</button><button onClick={() => onMessage(item.audience, locations.find((location) => location.name === item.location)?.id ?? 1)}>Save Draft</button><button onClick={() => setThreadDraft(item)}>View Thread</button><button onClick={() => onArchiveDraft(item.id)}>{archivedDraftIds.includes(item.id) ? "Restore" : "Archive"}</button><button className="delete-action" onClick={() => onDeleteDraft(item.id)}>Delete</button></div></article>) : <div className="empty-state">No conversations yet. Saved drafts and client reports will appear here.</div>}</div>}
+    {section === "Communications" && <div className="panel-card communication-list"><div className="section-card-head"><div><h2>Demo communication inbox</h2><p>{drafts.length} fictional conversations · replies are never sent</p></div></div>{drafts.length ? drafts.map((item) => <article className={archivedDraftIds.includes(item.id) ? "archived" : ""} key={item.id}><span className={`draft-kind ${item.audience}`}>{item.audience === "client" ? "Client" : "Cleaner"}</span><div><h3>{item.recipient}<span className={`message-status ${item.messageStatus.toLowerCase()}`}>{item.messageStatus}</span>{archivedDraftIds.includes(item.id) && <em>Archived</em>}</h3><p>{item.location} · {item.status}</p><small>{item.time} · Reason: {item.reason}</small></div><div className="inbox-actions"><button onClick={() => openReply(item)}>Reply</button><button onClick={() => onMessage(item.audience, locations.find((location) => location.name === item.location)?.id ?? 1)}>Save Draft</button><button onClick={() => setThreadDraft(item)}>View Thread</button><button onClick={() => onArchiveDraft(item.id)}>{archivedDraftIds.includes(item.id) ? "Restore" : "Archive"}</button><button className="delete-action" onClick={() => onDeleteDraft(item.id)}>Delete</button></div></article>) : <div className="empty-state">No conversations yet. Saved drafts and client reports will appear here.</div>}</div>}
 
     {threadDraft && <div className="modal-backdrop"><section className="message-modal" role="dialog" aria-modal="true" aria-label="Conversation thread"><div className="modal-header"><div><span className="calculator-mark">✦</span><div><p>FICTIONAL THREAD</p><h2>{threadDraft.recipient}</h2></div></div><button onClick={() => setThreadDraft(null)} aria-label="Close conversation thread">×</button></div><div className="thread-view"><p><b>{threadDraft.time}</b> · {threadDraft.location}</p><div>{threadDraft.body}</div><small>No message in this demonstration thread has been sent.</small></div><div className="modal-actions"><button onClick={() => setThreadDraft(null)}>Close</button><button onClick={() => { setThreadDraft(null); onMessage(threadDraft.audience, locations.find((location) => location.name === threadDraft.location)?.id ?? 1); }}>Reply</button></div></section></div>}
+
+    {replyDraft && <div className="modal-backdrop" onMouseDown={(e) => { if (e.currentTarget === e.target) setReplyDraft(null); }}><section className="message-modal reply-modal" role="dialog" aria-modal="true" aria-label={`Reply to ${replyDraft.recipient}`}><div className="modal-header"><div><span className="calculator-mark">↩</span><div><p>FICTIONAL DEMO REPLY</p><h2>Reply to {replyDraft.recipient}</h2></div></div><button onClick={() => setReplyDraft(null)} aria-label="Close reply">×</button></div><div className="reply-context"><span>Most recent message</span><p>{replyDraft.body}</p></div><label className="reply-editor-label">Your reply<textarea className="message-editor" aria-label="Editable reply" value={replyText} onChange={(e) => setReplyText(e.target.value)} /></label><p className="reply-demo-note">This demonstration saves a draft only and never sends a message.</p><div className="modal-actions"><button onClick={() => { setReplyText(""); setReplyDraft(null); }}>Cancel</button><button onClick={() => setReplyDraft(null)}>Close</button><button onClick={() => { onSaveReply(replyDraft, replyText); setReplyDraft(null); }}>Save Draft</button></div></section></div>}
 
     {section === "Settings" && <><div className="settings-grid"><article className="panel-card settings-panel"><div className="section-card-head"><div><h2>Company profile</h2><p>Fictional demonstration settings</p></div></div><label>Company name<input value={settings.company} onChange={(e) => setSettings({ ...settings, company: e.target.value })} /></label><label>Service area<input value={settings.serviceArea} onChange={(e) => setSettings({ ...settings, serviceArea: e.target.value })} /></label><label>Operations email<input value={settings.email} onChange={(e) => setSettings({ ...settings, email: e.target.value })} /></label><label>Default timezone<select value={settings.timezone} onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}><option>Eastern Time</option><option>Central Time</option><option>Pacific Time</option></select></label></article><article className="panel-card settings-panel"><div className="section-card-head"><div><h2>Pay and notifications</h2><p>Demo workspace preferences</p></div></div><label>Default pay method<select value={settings.defaultPay} onChange={(e) => setSettings({ ...settings, defaultPay: e.target.value })}><option>Hourly</option><option>Flat rate</option><option>Percent of job</option><option>Monthly</option><option>Semimonthly</option></select></label><label className="toggle-row"><span><strong>Email status updates</strong><small>Send fictional operations summaries</small></span><input type="checkbox" checked={settings.emailUpdates} onChange={(e) => setSettings({ ...settings, emailUpdates: e.target.checked })} /></label><label className="toggle-row"><span><strong>Automatic service reminders</strong><small>Remind assigned cleaners before visits</small></span><input type="checkbox" checked={settings.autoReminders} onChange={(e) => setSettings({ ...settings, autoReminders: e.target.checked })} /></label><div className="settings-saved">Changes apply to this demo session only.</div></article></div><div className="settings-actions"><button className="primary-button" onClick={() => { setSettingsConfirmed(true); showToast("Demo settings saved for this session"); }}>Save Changes</button>{settingsConfirmed && <span role="status">✓ Settings saved for this demo session.</span>}</div></>}
 
@@ -239,6 +248,8 @@ export default function Home() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<DemoNotification[]>(initialNotifications);
   const [drafts, setDrafts] = useState<DraftRecord[]>(initialDrafts);
+  const [scheduleUnreadCount, setScheduleUnreadCount] = useState(3);
+  const [communicationUnreadCount, setCommunicationUnreadCount] = useState(5);
   const [owner, setOwner] = useState<OwnerRecord>(initialOwner);
   const [ownerDraft, setOwnerDraft] = useState<OwnerRecord>(initialOwner);
   const [ownerOpen, setOwnerOpen] = useState(false);
@@ -283,6 +294,11 @@ export default function Home() {
     return () => window.removeEventListener("keydown", focusSearch);
   }, []);
 
+  useEffect(() => {
+    if (activeNav === "Schedule") setScheduleUnreadCount(0);
+    if (activeNav === "Communications") setCommunicationUnreadCount(0);
+  }, [activeNav]);
+
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? locations[1];
   const unreadNotifications = notifications.filter((item) => !item.read).length;
 
@@ -318,6 +334,7 @@ export default function Home() {
     const recipient = messageAudience === "client" ? selectedLocation.client : selectedLocation.cleaner;
     const saved: DraftRecord = { id: Date.now(), audience: messageAudience, recipient, location: selectedLocation.name, status: selectedLocation.status, messageStatus: "Draft", time: "Today · Just now", reason: selectedLocation.notes, body: messageText };
     setDrafts((current) => [saved, ...current]);
+    if (activeNav !== "Communications") setCommunicationUnreadCount((current) => current + 1);
     addActivity({ icon: "✦", color: "teal-bg", title: `${messageAudience === "client" ? "Client" : "Cleaner"} draft saved for ${recipient}`, detail: `${selectedLocation.name} · ${selectedLocation.status}`, time: "Just now", reason: selectedLocation.notes });
     setMessageOpen(false); showToast("Draft saved to Communication Center");
   };
@@ -328,6 +345,7 @@ export default function Home() {
     const client = clients.find((item) => item.name === newJob.client) ?? clients[0];
     const next: LocationRecord = { id: Date.now(), name: `${newJob.location} · Extra Service`, address: locations.find((item) => item.name === newJob.location)?.address ?? "100 Demo Way", client: client.name, time: formatTimeRange(newJob.start, newJob.end), startTime: newJob.start, endTime: newJob.end, cleaner: cleaner.name, initials: cleaner.initials, value: Number(newJob.value), status: newJob.status, detail: `One-time service · ${newJob.date}`, notes: `${newJob.instructions} ${newJob.notes}`, color: "blue" };
     setLocations((current) => [...current, next]); setJobOpen(false); setNewJob({ ...initialJobDraft });
+    if (activeNav !== "Schedule") setScheduleUnreadCount((current) => current + 1);
     addActivity({ icon: "+", color: "blue-bg", title: `Job added for ${next.name}`, detail: `${next.cleaner} · ${next.time}`, time: "Just now", reason: newJob.instructions }); showToast("New fictional job saved");
   };
 
@@ -335,8 +353,16 @@ export default function Home() {
     const job = locations[0];
     const body = `Client problem report for ${job.name}\n\nDescription: ${problemDescription || "No description provided."}\nDemo photo: ${problemPhoto ? "Attached" : "Not attached"}\n\nFictional demonstration report only.`;
     setDrafts((current) => [{ id: Date.now(), audience: "client", recipient: "Brightline Cleaning Co.", location: job.name, status: job.status, messageStatus: "Pending", time: "Today · Just now", reason: problemDescription || "Client reported a service problem.", body }, ...current]);
+    if (activeNav !== "Communications") setCommunicationUnreadCount((current) => current + 1);
     addActivity({ icon: "!", color: "amber-bg", title: "Client problem report drafted", detail: job.name, time: "Just now", reason: problemDescription || "Client reported a service problem." });
     setProblemOpen(false); setProblemDescription(""); setProblemPhoto(false); showToast("Problem report saved to Communication Center");
+  };
+
+  const saveReplyDraft = (source: DraftRecord, reply: string) => {
+    const saved: DraftRecord = { ...source, id: Date.now(), messageStatus: "Draft", time: "Today · Just now", reason: `Reply draft to ${source.recipient}`, body: reply };
+    setDrafts((current) => [saved, ...current]);
+    addActivity({ icon: "↩", color: "blue-bg", title: `Reply draft saved for ${source.recipient}`, detail: source.location, time: "Just now", reason: `Owner prepared a fictional reply to the latest ${source.audience} message.` });
+    showToast("Reply saved as a fictional draft");
   };
 
   const searchGroups = useMemo(() => {
@@ -378,7 +404,7 @@ export default function Home() {
         <nav aria-label="Primary navigation">
           {navItems.map(([label, symbol]) => (
             <button key={label} onClick={() => setActiveNav(label)} className={activeNav === label ? "active" : ""}>
-              <Icon>{symbol}</Icon><span>{label}</span>{label === "Schedule" && <em>{locations.length}</em>}{label === "Communications" && drafts.length > 0 && <em>{drafts.length}</em>}
+              <Icon>{symbol}</Icon><span>{label}</span>{label === "Schedule" && scheduleUnreadCount > 0 && <em>{scheduleUnreadCount}</em>}{label === "Communications" && communicationUnreadCount > 0 && <em>{communicationUnreadCount}</em>}
             </button>
           ))}
         </nav>
@@ -459,7 +485,7 @@ export default function Home() {
             <article className="panel-card revenue-card"><div className="card-title"><div><h2>Weekly revenue</h2><p>Job Price by day</p></div><button onClick={() => showToast("Showing this fictional week")}>This week ⌄</button></div><div className="revenue-top"><strong>$4,860</strong><span>↑ 12.6%</span><small>vs. last week</small></div><div className="chart"><i style={{height:"42%"}} /><i style={{height:"63%"}} /><i style={{height:"54%"}} /><i style={{height:"78%"}} /><i style={{height:"71%"}} /><i style={{height:"92%"}} /><i className="today" style={{height:"46%"}} /></div><div className="chart-labels"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div></article>
             <article className="panel-card activity-card"><div className="card-title"><div><h2>Recent activity</h2><p>Live team updates</p></div><button onClick={() => setActivityOpen(true)}>See all</button></div><ul>{activity.slice(0, 3).map((item) => <li key={item.id}><span className={item.color}>{item.icon}</span><p><strong>{item.title}</strong><small>{item.detail} · {item.time}</small></p></li>)}</ul></article>
           </section>
-          </> : <SectionView section={activeNav} locations={locations} setLocations={setLocations} cleaners={cleaners} setCleaners={setCleaners} clients={clients} setClients={setClients} settings={settings} setSettings={setSettings} drafts={drafts} archivedDraftIds={archivedDraftIds} onArchiveDraft={(id) => setArchivedDraftIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} onDeleteDraft={(id) => { setDrafts((current) => current.filter((item) => item.id !== id)); setArchivedDraftIds((current) => current.filter((item) => item !== id)); showToast("Demo conversation deleted"); }} onBack={() => setActiveNav("Dashboard")} onOpenPay={() => setPayOpen(true)} onMessage={draftMessage} onActivity={addActivity} showToast={showToast} />}
+          </> : <SectionView section={activeNav} locations={locations} setLocations={setLocations} cleaners={cleaners} setCleaners={setCleaners} clients={clients} setClients={setClients} settings={settings} setSettings={setSettings} drafts={drafts} archivedDraftIds={archivedDraftIds} onArchiveDraft={(id) => setArchivedDraftIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} onDeleteDraft={(id) => { setDrafts((current) => current.filter((item) => item.id !== id)); setArchivedDraftIds((current) => current.filter((item) => item !== id)); showToast("Demo conversation deleted"); }} onSaveReply={saveReplyDraft} onBack={() => setActiveNav("Dashboard")} onOpenPay={() => setPayOpen(true)} onMessage={draftMessage} onActivity={addActivity} showToast={showToast} />}
         </div>
       </section>
 
