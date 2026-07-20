@@ -6,11 +6,13 @@ type ServiceStatus = "Completed" | "Missed" | "Client Closed";
 type PayMode = "Hourly" | "Flat rate" | "% of job" | "Monthly" | "Semimonthly";
 type MessageAudience = "client" | "cleaner";
 type DemoRole = "Owner/Admin" | "Cleaner" | "Client/School";
-type DraftRecord = { id: number; audience: MessageAudience; recipient: string; location: string; status: ServiceStatus; time: string; reason: string; body: string };
+type DraftRecord = { id: number; audience: MessageAudience; recipient: string; location: string; status: ServiceStatus; messageStatus: "Draft" | "Pending" | "Resolved"; time: string; reason: string; body: string };
 type LocationRecord = (typeof initialLocations)[number];
-type CleanerRecord = { id: number; name: string; initials: string; role: string; email: string; phone: string; availability: string; location: string; shift: string; payMethod: string };
+type CleanerRecord = { id: number; name: string; initials: string; role: string; email: string; phone: string; availability: string; location: string; shift: string; startTime: string; endTime: string; payMethod: string };
 type ClientRecord = { id: number; name: string; title: string; email: string; phone: string; location: string; notes: string };
 type DemoSettings = { company: string; serviceArea: string; email: string; timezone: string; defaultPay: string; emailUpdates: boolean; autoReminders: boolean };
+type OwnerRecord = { name: string; company: string; email: string; phone: string; address: string };
+type DemoNotification = { id: number; text: string; read: boolean };
 
 type ActivityItem = {
   id: number;
@@ -35,6 +37,7 @@ const initialLocations = [
     address: "1840 Seaport Blvd · Suite 400",
     client: "Jordan Ellis",
     time: "6:00–8:30 AM",
+    startTime: "06:00", endTime: "08:30",
     cleaner: "Maya Chen",
     initials: "MC",
     value: 285,
@@ -49,6 +52,7 @@ const initialLocations = [
     address: "72 West Juniper Ave",
     client: "Priya Shah",
     time: "12:30–3:00 PM",
+    startTime: "12:30", endTime: "15:00",
     cleaner: "Luis Rivera",
     initials: "LR",
     value: 340,
@@ -63,6 +67,7 @@ const initialLocations = [
     address: "905 Atlas Street",
     client: "Marcus Bell",
     time: "5:30–8:00 PM",
+    startTime: "17:30", endTime: "20:00",
     cleaner: "Nia Brooks",
     initials: "NB",
     value: 260,
@@ -74,9 +79,9 @@ const initialLocations = [
 ];
 
 const initialCleaners: CleanerRecord[] = [
-  { id: 1, name: "Maya Chen", initials: "MC", role: "Lead cleaner", email: "maya.chen@example.test", phone: "(555) 010-4101", availability: "Checked in · Mon–Fri mornings", location: "Harbor Point Offices", shift: "6:00–8:30 AM", payMethod: "$24/hr" },
-  { id: 2, name: "Luis Rivera", initials: "LR", role: "Commercial cleaner", email: "luis.rivera@example.test", phone: "(555) 010-4102", availability: "Unavailable today · Tue–Sat", location: "Juniper Health Center", shift: "12:30–3:00 PM", payMethod: "$22/hr" },
-  { id: 3, name: "Nia Brooks", initials: "NB", role: "Evening specialist", email: "nia.brooks@example.test", phone: "(555) 010-4103", availability: "Checked in · Weekday evenings", location: "Northstar Learning Hub", shift: "5:30–8:00 PM", payMethod: "$155 flat" },
+  { id: 1, name: "Maya Chen", initials: "MC", role: "Lead cleaner", email: "maya.chen@example.test", phone: "(555) 010-4101", availability: "Checked in · Mon–Fri mornings", location: "Harbor Point Offices", shift: "6:00–8:30 AM", startTime: "06:00", endTime: "08:30", payMethod: "$24/hr" },
+  { id: 2, name: "Luis Rivera", initials: "LR", role: "Commercial cleaner", email: "luis.rivera@example.test", phone: "(555) 010-4102", availability: "Unavailable today · Tue–Sat", location: "Juniper Health Center", shift: "12:30–3:00 PM", startTime: "12:30", endTime: "15:00", payMethod: "$22/hr" },
+  { id: 3, name: "Nia Brooks", initials: "NB", role: "Evening specialist", email: "nia.brooks@example.test", phone: "(555) 010-4103", availability: "Checked in · Weekday evenings", location: "Northstar Learning Hub", shift: "5:30–8:00 PM", startTime: "17:30", endTime: "20:00", payMethod: "$155 flat" },
 ];
 
 const initialClients: ClientRecord[] = [
@@ -87,7 +92,20 @@ const initialClients: ClientRecord[] = [
 
 const initialSettings: DemoSettings = { company: "Brightline Cleaning Co.", serviceArea: "Harbor City Metro", email: "ops@brightline-demo.example", timezone: "Eastern Time", defaultPay: "Hourly", emailUpdates: true, autoReminders: true };
 const initialJobDraft = { client: "Jordan Ellis", location: "Harbor Point Offices", date: "2026-07-19", start: "09:00", end: "11:00", cleaner: "Maya Chen", value: 225, status: "Completed" as ServiceStatus, instructions: "Clean entry, offices, restrooms, and breakroom.", notes: "Fictional internal demo note." };
-const formatTime = (value: string) => { const [hourText, minute = "00"] = value.split(":"); const hour = Number(hourText); if (!Number.isFinite(hour)) return value; return `${hour % 12 || 12}:${minute} ${hour >= 12 ? "PM" : "AM"}`; };
+const formatTime = (value: string, format: "locale" | "12-hour" | "24-hour" = "locale") => { const [hourText, minute = "00"] = value.split(":"); const hour = Number(hourText); if (!Number.isFinite(hour)) return value; return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", ...(format === "locale" ? {} : { hour12: format === "12-hour" }) }).format(new Date(2026, 0, 1, hour, Number(minute))); };
+const formatTimeRange = (start: string, end: string) => `${formatTime(start)}–${formatTime(end)}`;
+const initialOwner: OwnerRecord = { name: "Avery Patel", company: "Brightline Cleaning Co.", email: "avery.patel@example.test", phone: "(555) 010-6001", address: "248 Market Square, Harbor City" };
+const initialNotifications: DemoNotification[] = [
+  { id: 1, text: "Client draft saved", read: false }, { id: 2, text: "Missed visit", read: false },
+  { id: 3, text: "Cleaner checked in", read: false }, { id: 4, text: "Schedule updated", read: false },
+];
+const initialDrafts: DraftRecord[] = [
+  { id: 101, audience: "client", recipient: "Priya Shah", location: "Juniper Health Center", status: "Missed", messageStatus: "Draft", time: "Today · 1:05 PM", reason: "AI-generated missed-visit update", body: "Hello Priya, this is a fictional draft regarding today’s missed service at Juniper Health Center. We are reviewing a replacement service window." },
+  { id: 102, audience: "cleaner", recipient: "Maya Chen", location: "Juniper Health Center", status: "Missed", messageStatus: "Pending", time: "Today · 1:12 PM", reason: "AI-generated cleaner assignment", body: "Hi Maya, this fictional assignment draft asks whether you can cover Juniper Health Center at 3:30 PM today." },
+  { id: 103, audience: "client", recipient: "Brightline Cleaning Co.", location: "Harbor Point Offices", status: "Completed", messageStatus: "Pending", time: "Yesterday · 4:40 PM", reason: "Client problem report with demo photo", body: "Fictional client report: the second-floor supply cabinet needs restocking before the next visit. A demo photo was attached." },
+  { id: 104, audience: "cleaner", recipient: "Nia Brooks", location: "Northstar Learning Hub", status: "Client Closed", messageStatus: "Draft", time: "Yesterday · 3:28 PM", reason: "Saved schedule-change draft", body: "Hi Nia, Northstar Learning Hub is closed today. This is a saved fictional schedule-change draft." },
+  { id: 105, audience: "client", recipient: "Jordan Ellis", location: "Harbor Point Offices", status: "Completed", messageStatus: "Resolved", time: "Friday · 9:15 AM", reason: "Completed-service follow-up", body: "Fictional inbox conversation confirming the completed Harbor Point service and quality checklist." },
+];
 
 const initialActivity: ActivityItem[] = [
   { id: 1, icon: "✓", color: "teal-bg", title: "Maya completed Harbor Point Offices", detail: "Quality checklist: 24/24", time: "Today · 8:21 AM", reason: "Cleaner submitted the completed service checklist." },
@@ -153,9 +171,9 @@ function SectionView({ section, locations, setLocations, cleaners, setCleaners, 
   const cancelEdit = () => { setDraft(selected ? { ...selected } : null); setEditing(false); };
   const saveEdit = () => {
     if (!modal || !draft) return;
-    if (modal.kind === "cleaner") setCleaners((all) => all.map((item) => item.id === draft.id ? draft : item));
+    if (modal.kind === "cleaner") setCleaners((all) => all.map((item) => item.id === draft.id ? { ...draft, shift: formatTimeRange(draft.startTime, draft.endTime) } : item));
     else if (modal.kind === "client") setClients((all) => all.map((item) => item.id === draft.id ? draft : item));
-    else setLocations((all) => all.map((item) => item.id === draft.id ? { ...draft, value: Number(draft.value) } : item));
+    else setLocations((all) => all.map((item) => item.id === draft.id ? { ...draft, time: formatTimeRange(draft.startTime, draft.endTime), value: Number(draft.value) } : item));
     setEditing(false);
     showToast(`${modal.kind === "service" ? "Service" : modal.kind[0].toUpperCase() + modal.kind.slice(1)} details saved`);
     onActivity({ icon: "✎", color: "blue-bg", title: `${modal.kind === "service" ? "Service" : modal.kind} details edited`, detail: draft.name, time: "Just now", reason: "Demo record updated for the current session." });
@@ -187,7 +205,7 @@ function SectionView({ section, locations, setLocations, cleaners, setCleaners, 
 
     {section === "Help center" && <div className="help-grid"><article className="panel-card help-intro"><div className="help-mark">?</div><h2>CleanFlow AI demo guide</h2><p>Use the dashboard to review service status, update locations, draft messages, calculate cleaner pay, and inspect the fictional activity log.</p></article><article className="panel-card help-list">{guides.map(([title, explanation], index) => <div className={openGuide === index ? "guide-open" : ""} key={title}><button aria-expanded={openGuide === index} onClick={() => setOpenGuide(openGuide === index ? null : index)}><span>{index + 1}</span><p><strong>{title}</strong><small>{openGuide === index ? explanation : "Select to learn more"}</small></p><b>{openGuide === index ? "−" : "+"}</b></button></div>)}</article></div>}
 
-    {section === "Communications" && <div className="panel-card communication-list"><div className="section-card-head"><div><h2>Demo communication inbox</h2><p>{drafts.length} fictional conversations · replies are never sent</p></div></div>{drafts.length ? drafts.map((item) => <article className={archivedDraftIds.includes(item.id) ? "archived" : ""} key={item.id}><span className={`draft-kind ${item.audience}`}>{item.audience === "client" ? "Client" : "Cleaner"}</span><div><h3>{item.recipient}{archivedDraftIds.includes(item.id) && <em>Archived</em>}</h3><p>{item.location} · {item.status}</p><small>{item.time} · Reason: {item.reason}</small></div><div className="inbox-actions"><button onClick={() => onMessage(item.audience, locations.find((location) => location.name === item.location)?.id ?? 1)}>Reply</button><button onClick={() => onMessage(item.audience, locations.find((location) => location.name === item.location)?.id ?? 1)}>Save Draft</button><button onClick={() => setThreadDraft(item)}>View Thread</button><button onClick={() => onArchiveDraft(item.id)}>{archivedDraftIds.includes(item.id) ? "Restore" : "Archive"}</button><button className="delete-action" onClick={() => onDeleteDraft(item.id)}>Delete</button></div></article>) : <div className="empty-state">No conversations yet. Saved drafts and client reports will appear here.</div>}</div>}
+    {section === "Communications" && <div className="panel-card communication-list"><div className="section-card-head"><div><h2>Demo communication inbox</h2><p>{drafts.length} fictional conversations · replies are never sent</p></div></div>{drafts.length ? drafts.map((item) => <article className={archivedDraftIds.includes(item.id) ? "archived" : ""} key={item.id}><span className={`draft-kind ${item.audience}`}>{item.audience === "client" ? "Client" : "Cleaner"}</span><div><h3>{item.recipient}<span className={`message-status ${item.messageStatus.toLowerCase()}`}>{item.messageStatus}</span>{archivedDraftIds.includes(item.id) && <em>Archived</em>}</h3><p>{item.location} · {item.status}</p><small>{item.time} · Reason: {item.reason}</small></div><div className="inbox-actions"><button onClick={() => onMessage(item.audience, locations.find((location) => location.name === item.location)?.id ?? 1)}>Reply</button><button onClick={() => onMessage(item.audience, locations.find((location) => location.name === item.location)?.id ?? 1)}>Save Draft</button><button onClick={() => setThreadDraft(item)}>View Thread</button><button onClick={() => onArchiveDraft(item.id)}>{archivedDraftIds.includes(item.id) ? "Restore" : "Archive"}</button><button className="delete-action" onClick={() => onDeleteDraft(item.id)}>Delete</button></div></article>) : <div className="empty-state">No conversations yet. Saved drafts and client reports will appear here.</div>}</div>}
 
     {threadDraft && <div className="modal-backdrop"><section className="message-modal" role="dialog" aria-modal="true" aria-label="Conversation thread"><div className="modal-header"><div><span className="calculator-mark">✦</span><div><p>FICTIONAL THREAD</p><h2>{threadDraft.recipient}</h2></div></div><button onClick={() => setThreadDraft(null)} aria-label="Close conversation thread">×</button></div><div className="thread-view"><p><b>{threadDraft.time}</b> · {threadDraft.location}</p><div>{threadDraft.body}</div><small>No message in this demonstration thread has been sent.</small></div><div className="modal-actions"><button onClick={() => setThreadDraft(null)}>Close</button><button onClick={() => { setThreadDraft(null); onMessage(threadDraft.audience, locations.find((location) => location.name === threadDraft.location)?.id ?? 1); }}>Reply</button></div></section></div>}
 
@@ -200,8 +218,8 @@ function SectionView({ section, locations, setLocations, cleaners, setCleaners, 
           {modal.kind === "cleaner" && <><div><span>Name</span><b>{selected.name}</b></div><div><span>Role</span><b>{selected.role}</b></div><div><span>Email</span><b>{selected.email}</b></div><div><span>Phone</span><b>{selected.phone}</b></div><div><span>Availability</span><b>{selected.availability}</b></div><div><span>Assigned location</span><b>{selected.location}</b></div><div><span>Service time</span><b>{selected.shift}</b></div><div><span>Pay method</span><b>{selected.payMethod}</b></div></>}
           {modal.kind === "client" && <><div><span>Name</span><b>{selected.name}</b></div><div><span>Role</span><b>{selected.title}</b></div><div><span>Email</span><b>{selected.email}</b></div><div><span>Phone</span><b>{selected.phone}</b></div><div><span>Linked location</span><b>{selected.location}</b></div><div className="detail-notes"><span>Notes</span><b>{selected.notes}</b></div></>}
         </div> : <div className="record-form">
-          {(modal.kind === "service" || modal.kind === "location") && <>{modal.kind === "location" && <><label>Address<input value={draft.address} onChange={(e) => updateDraft("address", e.target.value)} /></label><label>Service plan<input value={draft.detail} onChange={(e) => updateDraft("detail", e.target.value)} /></label></>}<label>Assigned cleaner<select value={draft.cleaner} onChange={(e) => updateDraft("cleaner", e.target.value)}>{cleaners.map((cleaner) => <option key={cleaner.id}>{cleaner.name}</option>)}</select></label><label>Service time<input value={draft.time} onChange={(e) => updateDraft("time", e.target.value)} /></label>{modal.kind === "service" && <label>Status<select value={draft.status} onChange={(e) => updateDraft("status", e.target.value)}><option>Completed</option><option>Missed</option><option>Client Closed</option></select></label>}{modal.kind === "location" && <label>Job Price<input type="number" value={draft.value} onChange={(e) => updateDraft("value", e.target.value)} /></label>}<label className="full">Notes<textarea value={draft.notes} onChange={(e) => updateDraft("notes", e.target.value)} /></label></>}
-          {modal.kind === "cleaner" && <><label>Name<input value={draft.name} onChange={(e) => updateDraft("name", e.target.value)} /></label><label>Email<input value={draft.email} onChange={(e) => updateDraft("email", e.target.value)} /></label><label>Phone<input value={draft.phone} onChange={(e) => updateDraft("phone", e.target.value)} /></label><label>Availability<input value={draft.availability} onChange={(e) => updateDraft("availability", e.target.value)} /></label><label>Assigned location<select value={draft.location} onChange={(e) => updateDraft("location", e.target.value)}>{locations.map((location) => <option key={location.id}>{location.name}</option>)}</select></label><label>Service time<input value={draft.shift} onChange={(e) => updateDraft("shift", e.target.value)} /></label><label className="full">Pay method<input value={draft.payMethod} onChange={(e) => updateDraft("payMethod", e.target.value)} /></label></>}
+          {(modal.kind === "service" || modal.kind === "location") && <>{modal.kind === "location" && <><label>Address<input value={draft.address} onChange={(e) => updateDraft("address", e.target.value)} /></label><label>Service plan<input value={draft.detail} onChange={(e) => updateDraft("detail", e.target.value)} /></label></>}<label>Assigned cleaner<select value={draft.cleaner} onChange={(e) => updateDraft("cleaner", e.target.value)}>{cleaners.map((cleaner) => <option key={cleaner.id}>{cleaner.name}</option>)}</select></label><label>Start time<input type="time" value={draft.startTime} onChange={(e) => updateDraft("startTime", e.target.value)} /></label><label>End time<input type="time" value={draft.endTime} onChange={(e) => updateDraft("endTime", e.target.value)} /></label>{modal.kind === "service" && <label>Status<select value={draft.status} onChange={(e) => updateDraft("status", e.target.value)}><option>Completed</option><option>Missed</option><option>Client Closed</option></select></label>}{modal.kind === "location" && <label>Job Price<input type="number" value={draft.value} onChange={(e) => updateDraft("value", e.target.value)} /></label>}<label className="full">Notes<textarea value={draft.notes} onChange={(e) => updateDraft("notes", e.target.value)} /></label></>}
+          {modal.kind === "cleaner" && <><label>Name<input value={draft.name} onChange={(e) => updateDraft("name", e.target.value)} /></label><label>Email<input value={draft.email} onChange={(e) => updateDraft("email", e.target.value)} /></label><label>Phone<input value={draft.phone} onChange={(e) => updateDraft("phone", e.target.value)} /></label><label>Availability<input value={draft.availability} onChange={(e) => updateDraft("availability", e.target.value)} /></label><label>Assigned location<select value={draft.location} onChange={(e) => updateDraft("location", e.target.value)}>{locations.map((location) => <option key={location.id}>{location.name}</option>)}</select></label><label>Start time<input type="time" value={draft.startTime} onChange={(e) => updateDraft("startTime", e.target.value)} /></label><label>End time<input type="time" value={draft.endTime} onChange={(e) => updateDraft("endTime", e.target.value)} /></label><label className="full">Pay method<input value={draft.payMethod} onChange={(e) => updateDraft("payMethod", e.target.value)} /></label></>}
           {modal.kind === "client" && <><label>Name<input value={draft.name} onChange={(e) => updateDraft("name", e.target.value)} /></label><label>Email<input value={draft.email} onChange={(e) => updateDraft("email", e.target.value)} /></label><label>Phone<input value={draft.phone} onChange={(e) => updateDraft("phone", e.target.value)} /></label><label>Linked location<select value={draft.location} onChange={(e) => updateDraft("location", e.target.value)}>{locations.map((location) => <option key={location.id}>{location.name}</option>)}</select></label><label className="full">Notes<textarea value={draft.notes} onChange={(e) => updateDraft("notes", e.target.value)} /></label></>}
         </div>}
       </div><div className="modal-actions">{editing ? <><button onClick={cancelEdit}>Cancel</button><button onClick={saveEdit}>Save</button></> : <><button onClick={closeDetails}>Close</button><button onClick={() => onMessage("cleaner", modal.kind === "service" || modal.kind === "location" ? selected.id : locations.find((item) => item.name === selected.location)?.id ?? 1)}>Message Cleaner</button><button onClick={() => onMessage("client", modal.kind === "service" || modal.kind === "location" ? selected.id : locations.find((item) => item.name === selected.location)?.id ?? 1)}>Message Client</button><button onClick={() => setEditing(true)}>Edit {modal.kind === "service" ? "Service" : modal.kind[0].toUpperCase() + modal.kind.slice(1)}</button></>}</div></section></div>}
@@ -219,9 +237,11 @@ export default function Home() {
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notificationsRead, setNotificationsRead] = useState(false);
-  const [notifications, setNotifications] = useState(["Client draft saved", "Missed visit", "Cleaner checked in", "Schedule updated"]);
-  const [drafts, setDrafts] = useState<DraftRecord[]>([]);
+  const [notifications, setNotifications] = useState<DemoNotification[]>(initialNotifications);
+  const [drafts, setDrafts] = useState<DraftRecord[]>(initialDrafts);
+  const [owner, setOwner] = useState<OwnerRecord>(initialOwner);
+  const [ownerDraft, setOwnerDraft] = useState<OwnerRecord>(initialOwner);
+  const [ownerOpen, setOwnerOpen] = useState(false);
   const [archivedDraftIds, setArchivedDraftIds] = useState<number[]>([]);
   const [jobOpen, setJobOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState<"jobs" | "completed" | "revenue" | "cleaners" | null>(null);
@@ -264,6 +284,7 @@ export default function Home() {
   }, []);
 
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? locations[1];
+  const unreadNotifications = notifications.filter((item) => !item.read).length;
 
   const pay = useMemo(() => {
     const dailyRate = periodBase / Math.max(1, scheduledDays);
@@ -295,7 +316,7 @@ export default function Home() {
 
   const saveDraft = () => {
     const recipient = messageAudience === "client" ? selectedLocation.client : selectedLocation.cleaner;
-    const saved: DraftRecord = { id: Date.now(), audience: messageAudience, recipient, location: selectedLocation.name, status: selectedLocation.status, time: "Today · Just now", reason: selectedLocation.notes, body: messageText };
+    const saved: DraftRecord = { id: Date.now(), audience: messageAudience, recipient, location: selectedLocation.name, status: selectedLocation.status, messageStatus: "Draft", time: "Today · Just now", reason: selectedLocation.notes, body: messageText };
     setDrafts((current) => [saved, ...current]);
     addActivity({ icon: "✦", color: "teal-bg", title: `${messageAudience === "client" ? "Client" : "Cleaner"} draft saved for ${recipient}`, detail: `${selectedLocation.name} · ${selectedLocation.status}`, time: "Just now", reason: selectedLocation.notes });
     setMessageOpen(false); showToast("Draft saved to Communication Center");
@@ -305,7 +326,7 @@ export default function Home() {
   const saveJob = () => {
     const cleaner = cleaners.find((item) => item.name === newJob.cleaner) ?? cleaners[0];
     const client = clients.find((item) => item.name === newJob.client) ?? clients[0];
-    const next: LocationRecord = { id: Date.now(), name: `${newJob.location} · Extra Service`, address: locations.find((item) => item.name === newJob.location)?.address ?? "100 Demo Way", client: client.name, time: `${formatTime(newJob.start)}–${formatTime(newJob.end)}`, cleaner: cleaner.name, initials: cleaner.initials, value: Number(newJob.value), status: newJob.status, detail: `One-time service · ${newJob.date}`, notes: `${newJob.instructions} ${newJob.notes}`, color: "blue" };
+    const next: LocationRecord = { id: Date.now(), name: `${newJob.location} · Extra Service`, address: locations.find((item) => item.name === newJob.location)?.address ?? "100 Demo Way", client: client.name, time: formatTimeRange(newJob.start, newJob.end), startTime: newJob.start, endTime: newJob.end, cleaner: cleaner.name, initials: cleaner.initials, value: Number(newJob.value), status: newJob.status, detail: `One-time service · ${newJob.date}`, notes: `${newJob.instructions} ${newJob.notes}`, color: "blue" };
     setLocations((current) => [...current, next]); setJobOpen(false); setNewJob({ ...initialJobDraft });
     addActivity({ icon: "+", color: "blue-bg", title: `Job added for ${next.name}`, detail: `${next.cleaner} · ${next.time}`, time: "Just now", reason: newJob.instructions }); showToast("New fictional job saved");
   };
@@ -313,7 +334,7 @@ export default function Home() {
   const submitProblem = () => {
     const job = locations[0];
     const body = `Client problem report for ${job.name}\n\nDescription: ${problemDescription || "No description provided."}\nDemo photo: ${problemPhoto ? "Attached" : "Not attached"}\n\nFictional demonstration report only.`;
-    setDrafts((current) => [{ id: Date.now(), audience: "client", recipient: "Brightline Cleaning Co.", location: job.name, status: job.status, time: "Today · Just now", reason: problemDescription || "Client reported a service problem.", body }, ...current]);
+    setDrafts((current) => [{ id: Date.now(), audience: "client", recipient: "Brightline Cleaning Co.", location: job.name, status: job.status, messageStatus: "Pending", time: "Today · Just now", reason: problemDescription || "Client reported a service problem.", body }, ...current]);
     addActivity({ icon: "!", color: "amber-bg", title: "Client problem report drafted", detail: job.name, time: "Just now", reason: problemDescription || "Client reported a service problem." });
     setProblemOpen(false); setProblemDescription(""); setProblemPhoto(false); showToast("Problem report saved to Communication Center");
   };
@@ -372,7 +393,11 @@ export default function Home() {
       <section className="main-panel">
         <header className="topbar">
           <div className="search-wrap"><div className="search"><span>⌕</span><input ref={searchRef} aria-label="Global search" placeholder="Search jobs, clients, cleaners…" value={searchQuery} onFocus={() => setSearchOpen(true)} onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }} /><kbd>⌘ K</kbd></div>{searchOpen && searchQuery && <div className="search-results" role="dialog" aria-label="Search results"><div className="search-result-head"><b>Search results</b><button onClick={() => setSearchOpen(false)} aria-label="Close search results">×</button></div>{searchGroups.length ? searchGroups.map((group) => <section key={group.label}><h3>{group.label}</h3>{group.items.map((item) => <button key={`${group.label}-${item.title}`} onClick={() => { setActiveNav(item.nav); setSearchOpen(false); }}><b>{item.title}</b><small>{item.detail}</small><span>→</span></button>)}</section>) : <div className="empty-state">No fictional locations, cleaners, clients, services, or jobs match “{searchQuery}”.</div>}</div>}</div>
-          <div className="top-actions"><div className="role-switch compact"><label>Switch Demo Role<select aria-label="Switch Demo Role" value={role} onChange={(e) => setRole(e.target.value as DemoRole)}><option>Owner/Admin</option><option>Cleaner</option><option>Client/School</option></select></label></div><div className="notification-wrap"><button className="icon-button" aria-label="Notifications" onClick={() => { setNotificationsOpen(!notificationsOpen); setNotificationsRead(true); }}>🔔{!notificationsRead && notifications.length > 0 && <i />}</button>{notificationsOpen && <div className="notification-panel" role="dialog" aria-label="Demo notifications"><div><b>Notifications</b><button onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">×</button></div>{notifications.length ? notifications.map((item) => <p key={item}>{item}</p>) : <div className="empty-state">No demo notifications.</div>}<footer><button onClick={() => setNotificationsRead(true)}>Mark all as read</button><button onClick={() => setNotifications([])}>Clear notifications</button></footer></div>}</div><div className="profile"><span>AP</span><div><strong>Avery Patel</strong><small>Owner/Admin</small></div></div></div>
+          <div className="top-actions">
+            <div className="role-switch compact"><label>Switch Demo Role<select aria-label="Switch Demo Role" value={role} onChange={(e) => setRole(e.target.value as DemoRole)}><option>Owner/Admin</option><option>Cleaner</option><option>Client/School</option></select></label></div>
+            <div className="notification-wrap"><button className="icon-button" aria-label={`${unreadNotifications} unread notifications`} onClick={() => setNotificationsOpen(!notificationsOpen)}>🔔{unreadNotifications > 0 && <em className="notification-count">{unreadNotifications}</em>}</button>{notificationsOpen && <div className="notification-panel" role="dialog" aria-label="Demo notifications"><div><b>Notifications · {unreadNotifications} unread</b><button onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">×</button></div>{notifications.length ? notifications.map((item) => <p className={item.read ? "read" : "unread"} key={item.id}>{item.text}<small>{item.read ? "Read" : "New"}</small></p>) : <div className="empty-state">No demo notifications.</div>}<footer><button disabled={unreadNotifications === 0} onClick={() => setNotifications((current) => current.map((item) => ({ ...item, read: true })))}>Mark All as Read</button><button onClick={() => setNotifications([])}>Clear Notifications</button></footer></div>}</div>
+            <button className="profile profile-button" onClick={() => { setOwnerDraft(owner); setOwnerOpen(true); }} aria-label="Edit Owner/Admin profile"><span>{owner.name.split(" ").map((part) => part[0]).join("").slice(0, 2)}</span><div><strong>{owner.name}</strong><small>Owner/Admin</small></div></button>
+          </div>
         </header>
 
         <div className="content">
@@ -488,6 +513,7 @@ export default function Home() {
           <div className="modal-actions"><button onClick={() => setActivityOpen(false)}>Close</button></div>
         </section>
       </div>}
+      {ownerOpen && <div className="modal-backdrop" onMouseDown={(e) => { if (e.currentTarget === e.target) setOwnerOpen(false); }}><section className="record-modal" role="dialog" aria-modal="true" aria-label="Edit Owner/Admin profile"><div className="modal-header"><div><span className="calculator-mark">AP</span><div><p>DEMO OWNER PROFILE</p><h2>Owner/Admin Profile</h2></div></div><button onClick={() => setOwnerOpen(false)} aria-label="Close owner profile">×</button></div><div className="record-body record-form"><label>Name<input value={ownerDraft.name} onChange={(e) => setOwnerDraft({ ...ownerDraft, name: e.target.value })} /></label><label>Company<input value={ownerDraft.company} onChange={(e) => setOwnerDraft({ ...ownerDraft, company: e.target.value })} /></label><label>Email<input type="email" value={ownerDraft.email} onChange={(e) => setOwnerDraft({ ...ownerDraft, email: e.target.value })} /></label><label>Phone<input value={ownerDraft.phone} onChange={(e) => setOwnerDraft({ ...ownerDraft, phone: e.target.value })} /></label><label className="full">Business Address<input value={ownerDraft.address} onChange={(e) => setOwnerDraft({ ...ownerDraft, address: e.target.value })} /></label></div><div className="modal-actions"><button onClick={() => { setOwnerDraft(owner); setOwnerOpen(false); }}>Cancel</button><button onClick={() => { setOwner(ownerDraft); setSettings((current) => ({ ...current, company: ownerDraft.company })); setOwnerOpen(false); showToast("Owner profile saved for this demo session"); }}>Save Changes</button></div></section></div>}
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
     </main>
   );
