@@ -1,98 +1,90 @@
-# vinext-starter
+# CleanFlow AI
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+CleanFlow AI is a polished operational-intelligence prototype for small commercial cleaning-service businesses. It brings scheduling, service status, cleaner pay estimates, client communication drafts, activity tracking, and role-based demo portals into one responsive workspace.
 
-## Prerequisites
+> All names, companies, locations, contact details, figures, messages, and activity records in this project are fictional demonstration data.
 
-- Node.js `>=22.13.0`
+## Private Demo
 
-## Quick Start
+The Build Week prototype is hosted as a private OpenAI Site. Authorized viewers can open it at:
+
+https://cleanflow-ai-demo.famy1617.chatgpt.site
+
+## Highlights
+
+- Owner/Admin dashboard with interactive daily operations summaries
+- Schedule, locations, team, clients, reports, help, and settings views
+- Completed, Missed, and Client Closed service statuses
+- Hourly, flat-rate, percentage, monthly, and semimonthly pay estimates
+- Global search across fictional jobs, locations, cleaners, and clients
+- Communication Center with editable client and cleaner drafts
+- Polished reply workflow with recent-message context and draft saving
+- Cleaner and Client/School demo portals with role-appropriate information
+- Session-only editing for services, locations, cleaners, clients, and settings
+- Demo notifications, activity history, checklists, and mock photo uploads
+
+No messages are sent, no real files are uploaded, and no production customer or payroll data is stored.
+
+## Built with GPT-5.6 and Codex
+
+GPT-5.6 and Codex were used as collaborative product-development tools throughout the project:
+
+- **GPT-5.6** helped translate the Build Week concept into clear operational workflows, fictional demo content, role-based privacy rules, UX copy, interaction requirements, and focused polish decisions.
+- **Codex** worked directly in the project workspace to implement the React interface, preserve the established visual system, connect interactive states, diagnose issues, run production builds, and verify behavior in the browser.
+- The project was developed iteratively: requirements were converted into small implementation passes, tested against the production build, and refined without redesigning stable parts of the application.
+- Final QA covered navigation, search, role switching, modals, editable forms, notifications, communication drafts, pay estimates, activity records, and responsive interaction behavior.
+
+AI assistance accelerated implementation and review, while all product decisions, demo scope, and publishing actions remained under human direction and approval.
+
+## Technology
+
+- React 19
+- TypeScript
+- vinext and Vite
+- Cloudflare-compatible OpenAI Sites deployment
+- CSS with responsive layouts and session-only client state
+
+## Local Setup
+
+### Prerequisites
+
+- Node.js 22.13 or newer
+- pnpm
+
+### Install and run
 
 ```bash
-npm install
-npm run dev
-npm run build
+pnpm install
+pnpm run dev
 ```
 
-This starter does not use `wrangler.jsonc`.
+Create a production build with:
 
-## Included Shape
-
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+pnpm run build
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+The application uses fictional in-memory data. Edits made in the prototype last only for the current browser session.
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+## Project Structure
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+```text
+app/
+  page.tsx       Main CleanFlow AI application and demo interactions
+  globals.css    Existing visual system and responsive styling
+  layout.tsx     Site metadata and application shell
+public/          Static assets
+.openai/         Private Sites hosting configuration
+```
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+## Demo Safety
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+- Do not enter real client, cleaner, payroll, or contact information.
+- Communication actions save fictional drafts only.
+- Photo uploads are demonstration placeholders.
+- The pay calculator provides estimates and is not a payroll system.
+- The prototype does not include invoicing, payroll processing, or calendar importing.
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+## License
 
-## Useful Commands
-
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+This repository is provided as a demonstration project for Build Week.
